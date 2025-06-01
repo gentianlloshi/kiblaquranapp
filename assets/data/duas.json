@@ -1,0 +1,67 @@
+[
+  {
+    "id": "dua1",
+    "title": "Dua para gjumit",
+    "category": "daily",
+    "arabic_text": "بِاسْمِكَ اللّهُمَّ أَمُوتُ وَأَحْيَا",
+    "transliteration": "Bismika Allahumma amutu wa ahya",
+    "translation": "Me emrin tënd, O Allah, unë vdes dhe jetoj",
+    "reference": "Buhariu",
+    "audio_url": "assets/audio/dua_para_gjumit.mp3"
+  },
+  {
+    "id": "dua2",
+    "title": "Dua pas zgjimit",
+    "category": "daily",
+    "arabic_text": "الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ",
+    "transliteration": "Alhamdu lillahil-ladhi ahyana ba'da ma amatana wa ilayhin-nushur",
+    "translation": "Falënderimi i takon Allahut i cili na ringjalli pas vdekjes sonë dhe tek Ai është kthimi",
+    "reference": "Buhariu",
+    "audio_url": "assets/audio/dua_pas_zgjimit.mp3"
+  },
+  {
+    "id": "morning1",
+    "title": "Dua e mëngjesit 1",
+    "category": "morning_evening",
+    "subcategory": "morning",
+    "arabic_text": "أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لاَ إِلَٰهَ إِلاَّ اللهُ وَحْدَهُ لاَ شَرِيكَ لَهُ",
+    "transliteration": "Asbahna wa asbahal-mulku lillah walhamdu lillah la ilaha illallah wahdahu la sharika lah",
+    "translation": "Ne u zgjuam dhe e tërë mbretëria i përket Allahut, falënderimi i takon Allahut, nuk ka zot tjetër përveç Allahut, i Cili është Një dhe nuk ka shok",
+    "reference": "Muslim",
+    "audio_url": "assets/audio/dua_mengjes1.mp3"
+  },
+  {
+    "id": "evening1",
+    "title": "Dua e mbrëmjes 1",
+    "category": "morning_evening",
+    "subcategory": "evening",
+    "arabic_text": "أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لاَ إِلَٰهَ إِلاَّ اللهُ وَحْدَهُ لاَ شَرِيكَ لَهُ",
+    "transliteration": "Amsayna wa amsal-mulku lillah walhamdu lillah la ilaha illallah wahdahu la sharika lah",
+    "translation": "Ne jemi në mbrëmje dhe e tërë mbretëria i përket Allahut, falënderimi i takon Allahut, nuk ka zot tjetër përveç Allahut, i Cili është Një dhe nuk ka shok",
+    "reference": "Muslim",
+    "audio_url": "assets/audio/dua_mbremje1.mp3"
+  },
+  {
+    "id": "prayer1",
+    "title": "Dua para faljes",
+    "category": "prayer_related",
+    "arabic_text": "سُبْحَانَكَ اللَّهُمَّ وَبِحَمْدِكَ، وَتَبَارَكَ اسْمُكَ، وَتَعَالَى جَدُّكَ، وَلاَ إِلَٰهَ غَيْرُكَ",
+    "transliteration": "Subhanaka Allahumma wa bihamdika, wa tabarakasmuka, wa ta'ala jadduka, wa la ilaha ghayruk",
+    "translation": "O Allahu im, Ti je i Patëmeta dhe të takon Ty falënderimi, emri Yt është i bekuar, autoriteti Yt është i Lartësuar dhe nuk ka hyjni tjetër përveç Teje",
+    "reference": "Abu Dawud, Tirmidhiu",
+    "audio_url": "assets/audio/dua_para_faljes.mp3"
+  },
+  {
+    "id": "quran1",
+    "title": "Dua për prindërit",
+    "category": "quranic",
+    "arabic_text": "رَبِّ ارْحَمْهُمَا كَمَا رَبَّيَانِي صَغِيرًا",
+    "transliteration": "Rabbi irhamhuma kama rabba-yani saghira",
+    "translation": "Zoti im! Mëshiroji ata, ashtu siç më kanë rritur kur isha i vogël",
+    "reference": "Kurani 17:24",
+    "surah": "Al-Isra",
+    "verse": "24",
+    "audio_url": "assets/audio/dua_prinderit.mp3"
+  }
+]
+

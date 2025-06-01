@@ -1,0 +1,43 @@
+[
+  {
+    "id": "name1",
+    "title": "Allah",
+    "arabic_text": "الله",
+    "transliteration": "Allah",
+    "translation": "Zoti, Hyjnia Supreme",
+    "reference": "Emri i parë"
+  },
+  {
+    "id": "name2",
+    "title": "Ar-Rahman",
+    "arabic_text": "الرحمن",
+    "transliteration": "Ar-Rahman",
+    "translation": "I Gjithëmëshirshmi",
+    "reference": "Emri i dytë"
+  },
+  {
+    "id": "name3",
+    "title": "Ar-Rahim",
+    "arabic_text": "الرحيم",
+    "transliteration": "Ar-Rahim",
+    "translation": "Mëshiruesi",
+    "reference": "Emri i tretë"
+  },
+  {
+    "id": "name4",
+    "title": "Al-Malik",
+    "arabic_text": "الملك",
+    "transliteration": "Al-Malik",
+    "translation": "Sunduesi",
+    "reference": "Emri i katërt"
+  },
+  {
+    "id": "name5",
+    "title": "Al-Quddus",
+    "arabic_text": "القدوس",
+    "transliteration": "Al-Quddus",
+    "translation": "I Shenjti",
+    "reference": "Emri i pestë"
+  }
+]
+
