@@ -46,3 +46,10 @@ app.*.map.json
 
 # Java heap dump files
 *.hprof
+
+# Build artifacts and large binary files
+/build/
+*.apk
+*.aab
+*.aar
+*.so
