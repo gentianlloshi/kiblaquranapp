@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../data/repositories/quran_repository.dart';
 import '../../../data/models/surah.dart';
 import '../../widgets/quran/ayah_widget.dart';
@@ -112,11 +113,22 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
   }
 
   void _shareAyah(int surahNumber, int ayahNumber, String arabicText, String translationText) {
-    // Implement share functionality in future
-    final textToShare = 'Surah $surahNumber, Ayah $ayahNumber\n\n$arabicText\n\n$translationText';
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Share functionality will be implemented soon')),
-    );
+    final surahName = _arabicSurah.name;
+    final transliterationText = _transliterations[ayahNumber.toString()] ?? '';
+    
+    final shareText = '''
+Quran - Surah $surahName ($surahNumber:$ayahNumber)
+
+$arabicText
+
+${_showTransliteration ? transliterationText : ''}
+
+$translationText
+
+Shared from Kibla App
+''';
+
+    Share.share(shareText, subject: 'Quran - Surah $surahName, Ayah $ayahNumber');
   }
 
   @override

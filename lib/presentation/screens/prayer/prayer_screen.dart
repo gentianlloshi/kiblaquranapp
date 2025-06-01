@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../data/repositories/prayer_repository.dart';
 import '../../../data/repositories/qibla_repository.dart';
@@ -212,67 +213,93 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
   Widget _buildNextPrayerCard(PrayerTime? nextPrayer) {
     if (nextPrayer == null) {
-      return const SizedBox.shrink();
+      return const Card(
+        elevation: 4,
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Center(
+            child: Text('Duke llogaritur faljen e ardhshme...'),
+          ),
+        ),
+      );
     }
-    
-    final countdownText = _formatDuration(_timeUntilNextPrayer);
 
     return Card(
       elevation: 4,
-      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Falja e ardhshme',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildPrayerIcon(nextPrayer.type, 32),
-                const SizedBox(width: 16),
                 Text(
-                  nextPrayer.type,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 32,
-                  ),
+                  'Falja e ardhshme',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.share),
+                  onPressed: () => _sharePrayerTime(nextPrayer),
+                  tooltip: 'Ndaje',
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              DateFormat('HH:mm').format(nextPrayer.time),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 48,
-              ),
-            ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'Mbetur: $countdownText',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.bold,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      nextPrayer.type,
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      DateFormat.jm().format(nextPrayer.time),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ],
                 ),
-              ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text('Mbeten'),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatDuration(_timeUntilNextPrayer),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  void _sharePrayerTime(PrayerTime prayer) {
+    final dateStr = DateFormat('dd MMMM yyyy', 'sq').format(DateTime.now());
+    final timeStr = DateFormat.jm().format(prayer.time);
+    
+    final shareText = '''
+Kohët e Faljes - Kibla App
+$dateStr
+
+Falja e ardhshme: ${prayer.type} në $timeStr
+
+Mbeten: ${_formatDuration(_timeUntilNextPrayer)}
+''';
+
+    Share.share(shareText, subject: 'Kohët e Faljes');
   }
 
   Widget _buildPrayerTimesList(List<PrayerTime> prayerTimes, PrayerTime? nextPrayer) {
@@ -296,52 +323,45 @@ class _PrayerScreenState extends State<PrayerScreen> {
   }
 
   Widget _buildPrayerTimeItem(PrayerTime prayer, bool isNext) {
-    return Consumer<PrayerRepository>(
-      builder: (context, repository, _) {
-        return Container(
-          decoration: BoxDecoration(
-            color: isNext ? Theme.of(context).colorScheme.primary.withOpacity(0.1) : null,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          margin: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            children: [
-              _buildPrayerIcon(prayer.type, 24),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  prayer.type,
-                  style: TextStyle(
-                    fontWeight: isNext ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 16,
-                  ),
-                ),
+    final textStyle = isNext
+        ? TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)
+        : null;
+
+    return Card(
+      elevation: 1,
+      color: isNext ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3) : null,
+      child: ListTile(
+        leading: Icon(
+          _getPrayerIcon(prayer.type),
+          color: isNext ? Theme.of(context).colorScheme.primary : null,
+        ),
+        title: Text(prayer.type, style: textStyle),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              DateFormat.jm().format(prayer.time),
+              style: textStyle,
+            ),
+            IconButton(
+              icon: Icon(
+                prayer.notificationEnabled ? Icons.notifications_active : Icons.notifications_off,
               ),
-              Text(
-                DateFormat('HH:mm').format(prayer.time),
-                style: TextStyle(
-                  fontWeight: isNext ? FontWeight.bold : FontWeight.normal,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Switch(
-                value: prayer.notificationEnabled,
-                onChanged: (value) {
-                  repository.togglePrayerNotification(prayer.type);
-                  // Reschedule notifications after toggling
-                  _scheduleNotifications(repository);
-                },
-              ),
-            ],
-          ),
-        );
-      },
+              onPressed: () => _toggleNotification(prayer),
+              tooltip: 'Njoftimet',
+            ),
+            IconButton(
+              icon: const Icon(Icons.share),
+              onPressed: () => _sharePrayerTime(prayer),
+              tooltip: 'Ndaje',
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildPrayerIcon(String prayerType, double size) {
+  IconData _getPrayerIcon(String prayerType) {
     IconData iconData;
 
     switch (prayerType) {
@@ -367,7 +387,14 @@ class _PrayerScreenState extends State<PrayerScreen> {
         iconData = Icons.access_time;
     }
     
-    return Icon(iconData, size: size);
+    return iconData;
+  }
+
+  void _toggleNotification(PrayerTime prayer) {
+    final prayerRepository = Provider.of<PrayerRepository>(context, listen: false);
+    prayerRepository.togglePrayerNotification(prayer.type);
+    // Reschedule notifications after toggling
+    _scheduleNotifications(prayerRepository);
   }
 
   Widget _buildCalculationMethodInfo(String method) {

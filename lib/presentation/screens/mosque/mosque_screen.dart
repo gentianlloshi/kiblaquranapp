@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../data/repositories/mosque_repository.dart';
 import '../../../data/repositories/qibla_repository.dart';
@@ -173,31 +176,101 @@ class _MosqueScreenState extends State<MosqueScreen> with SingleTickerProviderSt
     );
   }
   
-  Widget _buildMapView(List mosques) {
-    // In the future, implement a Google Map here
-    // For now, just display a placeholder
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.map,
-            size: 100,
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Harta do të implementohet në versionin e ardhshëm',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'U gjetën ${mosques.length} xhami në afërsi',
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+  Widget _buildMapView(List<Mosque> mosques) {
+    return Consumer<MosqueRepository>(
+      builder: (context, mosqueRepo, child) {
+        if (mosqueRepo.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        return FutureBuilder<Position>(
+          future: Geolocator.getCurrentPosition(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.location_off,
+                      size: 80,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Nuk mund të merret vendndodhja',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {});  // Refresh the widget
+                      },
+                      child: const Text('Provo përsëri'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            final position = snapshot.data!;
+            final initialCameraPosition = CameraPosition(
+              target: LatLng(position.latitude, position.longitude),
+              zoom: 14,
+            );
+            
+            final markers = <Marker>{};
+            
+            // Add marker for current location
+            markers.add(
+              Marker(
+                markerId: const MarkerId('current_location'),
+                position: LatLng(position.latitude, position.longitude),
+                infoWindow: const InfoWindow(
+                  title: 'Vendndodhja juaj',
+                ),
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+              ),
+            );
+            
+            // Add markers for mosques
+            for (final mosque in mosques) {
+              markers.add(
+                Marker(
+                  markerId: MarkerId(mosque.id),
+                  position: LatLng(mosque.latitude, mosque.longitude),
+                  infoWindow: InfoWindow(
+                    title: mosque.name,
+                    snippet: '${mosque.distance.toStringAsFixed(1)} km • ${mosque.address}',
+                    onTap: () {
+                      _showMosqueDetails(context, mosque);
+                    },
+                  ),
+                  onTap: () {
+                    // This is needed to ensure the info window shows up
+                  },
+                ),
+              );
+            }
+            
+            return GoogleMap(
+              initialCameraPosition: initialCameraPosition,
+              markers: markers,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+              mapToolbarEnabled: true,
+              zoomControlsEnabled: true,
+              onMapCreated: (GoogleMapController controller) {
+                // You could store the controller if needed for later use
+              },
+            );
+          },
+        );
+      },
     );
   }
   
@@ -364,172 +437,141 @@ class _MosqueScreenState extends State<MosqueScreen> with SingleTickerProviderSt
     );
   }
   
-  void _showMosqueDetails(BuildContext context, mosque) {
+  void _showMosqueDetails(BuildContext context, Mosque mosque) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Mosque image
-              Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                child: mosque.imageUrl != null
-                    ? Image.network(
-                        mosque.imageUrl,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (mosque.imageUrl != null)
+                  Container(
+                    height: 200,
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      image: DecorationImage(
+                        image: NetworkImage(mosque.imageUrl!),
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Center(
-                            child: Icon(
-                              Icons.mosque,
-                              size: 80,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          );
-                        },
-                      )
-                    : Center(
-                        child: Icon(
-                          Icons.mosque,
-                          size: 80,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
                       ),
-              ),
-              
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                  ),
+                Text(
+                  mosque.name,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Row(
                   children: [
-                    Text(
-                      mosque.name,
-                      style: Theme.of(context).textTheme.headlineSmall,
+                    const Icon(Icons.location_on, size: 16),
+                    const SizedBox(width: 4),
+                    Expanded(child: Text(mosque.address)),
+                    Text('${mosque.distance.toStringAsFixed(1)} km'),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (mosque.prayerTimes.isNotEmpty) ...[
+                  Text(
+                    'Kohët e Faljes',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Card(
+                    child: Column(
+                      children: mosque.prayerTimes.map((prayer) {
+                        return ListTile(
+                          title: Text(prayer.name),
+                          trailing: Text(prayer.time),
+                          dense: true,
+                        );
+                      }).toList(),
                     ),
-                    const SizedBox(height: 16),
-                    
-                    // Address
-                    const Text(
-                      'Adresa',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (mosque.facilities.isNotEmpty) ...[
+                  Text(
+                    'Shërbimet',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: mosque.facilities.map((facility) {
+                      return Chip(
+                        label: Text(facility),
+                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.directions),
+                      label: const Text('Udhëzime'),
+                      onPressed: () {
+                        _launchMapsUrl(mosque.latitude, mosque.longitude, mosque.name);
+                      },
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(mosque.address),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Distance
-                    const Text(
-                      'Distanca',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.directions_walk, size: 16, color: Colors.grey),
-                        const SizedBox(width: 4),
-                        Text('${mosque.distance.toStringAsFixed(1)} km larg'),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Facilities
-                    const Text(
-                      'Facilitetet',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _buildFacilityChip('Parking', mosque.hasParking),
-                        _buildFacilityChip('Wudu', mosque.hasWudu),
-                        _buildFacilityChip('Hyrje për femra', mosque.hasWomenSection),
-                        _buildFacilityChip('Librari', mosque.hasLibrary),
-                        _buildFacilityChip('WiFi', mosque.hasWifi),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Buttons
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.directions),
-                          label: const Text('Udhëzimet'),
-                          onPressed: () {
-                            // Implement directions functionality
-                            Navigator.pop(context);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
-                        ),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.access_time),
-                          label: const Text('Kohët e Faljes'),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _showMosquePrayerTimes(context, mosque);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
-                        ),
-                      ],
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.share),
+                      label: const Text('Ndaje'),
+                      onPressed: () {
+                        _shareMosqueLocation(mosque);
+                      },
                     ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
   
-  Widget _buildFacilityChip(String label, bool isAvailable) {
-    return Chip(
-      label: Text(label),
-      backgroundColor: isAvailable
-          ? Colors.green.withOpacity(0.1)
-          : Colors.grey.withOpacity(0.1),
-      labelStyle: TextStyle(
-        color: isAvailable ? Colors.green : Colors.grey,
-      ),
-      avatar: Icon(
-        isAvailable ? Icons.check_circle : Icons.cancel,
-        size: 16,
-        color: isAvailable ? Colors.green : Colors.grey,
-      ),
-    );
+  void _launchMapsUrl(double latitude, double longitude, String label) async {
+    final url = 'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude';
+    
+    // Using url_launcher would be better but we'll use a simple share for now
+    Share.share('$label - $url', subject: 'Vendndodhja e xhamisë');
   }
   
-  void _showMosquePrayerTimes(BuildContext context, mosque) {
+  void _shareMosqueLocation(Mosque mosque) {
+    final prayerTimesText = mosque.prayerTimes.isNotEmpty
+        ? '\nKohët e faljes:\n' + mosque.prayerTimes.map((p) => '${p.name}: ${p.time}').join('\n')
+        : '';
+        
+    final shareText = '''
+Xhamia: ${mosque.name}
+Adresa: ${mosque.address}
+Distanca: ${mosque.distance.toStringAsFixed(1)} km$prayerTimesText
+
+Shërbimet: ${mosque.facilities.join(', ')}
+
+Vendndodhja në Google Maps:
+https://www.google.com/maps/search/?api=1&query=${mosque.latitude},${mosque.longitude}
+
+Ndare nga Kibla App
+''';
+
+    Share.share(shareText, subject: 'Xhamia ${mosque.name}');
+  }
+  
+  void _showMosquePrayerTimes(BuildContext context, Mosque mosque) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
