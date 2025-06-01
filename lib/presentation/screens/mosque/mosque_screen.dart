@@ -487,13 +487,32 @@ class _MosqueScreenState extends State<MosqueScreen> with SingleTickerProviderSt
                   const SizedBox(height: 8),
                   Card(
                     child: Column(
-                      children: mosque.prayerTimes.map((prayer) {
-                        return ListTile(
-                          title: Text(prayer.name),
-                          trailing: Text(prayer.time),
-                          dense: true,
-                        );
-                      }).toList(),
+                      children: [
+                        ListTile(
+                          title: const Text('Fajr'),
+                          trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Fajr')),
+                        ),
+                        ListTile(
+                          title: const Text('Dhuhr'),
+                          trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Dhuhr')),
+                        ),
+                        ListTile(
+                          title: const Text('Asr'),
+                          trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Asr')),
+                        ),
+                        ListTile(
+                          title: const Text('Maghrib'),
+                          trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Maghrib')),
+                        ),
+                        ListTile(
+                          title: const Text('Isha'),
+                          trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Isha')),
+                        ),
+                        ListTile(
+                          title: const Text('Jumah'),
+                          trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Jumah')),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -581,27 +600,27 @@ Ndare nga Kibla App
           children: [
             ListTile(
               title: const Text('Fajr'),
-              trailing: Text(mosque.prayerTimes?.fajr ?? 'N/A'),
+              trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Fajr')),
             ),
             ListTile(
               title: const Text('Dhuhr'),
-              trailing: Text(mosque.prayerTimes?.dhuhr ?? 'N/A'),
+              trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Dhuhr')),
             ),
             ListTile(
               title: const Text('Asr'),
-              trailing: Text(mosque.prayerTimes?.asr ?? 'N/A'),
+              trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Asr')),
             ),
             ListTile(
               title: const Text('Maghrib'),
-              trailing: Text(mosque.prayerTimes?.maghrib ?? 'N/A'),
+              trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Maghrib')),
             ),
             ListTile(
               title: const Text('Isha'),
-              trailing: Text(mosque.prayerTimes?.isha ?? 'N/A'),
+              trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Isha')),
             ),
             ListTile(
               title: const Text('Jumah'),
-              trailing: Text(mosque.prayerTimes?.jumah ?? 'N/A'),
+              trailing: Text(_getPrayerTime(mosque.prayerTimes, 'Jumah')),
             ),
           ],
         ),
@@ -615,6 +634,14 @@ Ndare nga Kibla App
         ],
       ),
     );
+  }
+  
+  String _getPrayerTime(List<MosquePrayerTime> prayerTimes, String prayerName) {
+    final prayer = prayerTimes.firstWhere(
+      (prayer) => prayer.name.toLowerCase() == prayerName.toLowerCase(),
+      orElse: () => MosquePrayerTime(name: prayerName, time: 'N/A'),
+    );
+    return prayer.time;
   }
   
   void _showAddMosqueDialog(BuildContext context) {
