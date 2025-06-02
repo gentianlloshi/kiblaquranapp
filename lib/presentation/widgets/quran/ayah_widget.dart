@@ -1,30 +1,31 @@
 import 'package:flutter/material.dart';
 
 class AyahWidget extends StatelessWidget {
-  final int surahNumber;
   final int ayahNumber;
   final String arabicText;
   final String translationText;
   final String transliterationText;
+  final Function(int, int, String, String)? onShare;
+  final int? surahNumber;
+  final Function(int, int)? onPlayAudio;
+  final Function(int, int)? onToggleFavorite;
   final bool showArabic;
   final bool showTransliteration;
   final bool showTranslation;
-  final Function(int, int) onPlayAudio;
-  final Function(int, int) onToggleFavorite;
-  final Function(int, int, String, String) onShare;
 
-  const AyahWidget({super.key, 
-    required this.surahNumber,
+  const AyahWidget({
+    super.key,
     required this.ayahNumber,
     required this.arabicText,
     required this.translationText,
     required this.transliterationText,
-    required this.showArabic,
-    required this.showTransliteration,
-    required this.showTranslation,
-    required this.onPlayAudio,
-    required this.onToggleFavorite,
-    required this.onShare,
+    this.onShare,
+    this.surahNumber,
+    this.onPlayAudio,
+    this.onToggleFavorite,
+    this.showArabic = true,
+    this.showTransliteration = true,
+    this.showTranslation = true,
   });
 
   @override
@@ -46,27 +47,35 @@ class AyahWidget extends StatelessWidget {
                 ),
                 Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.play_arrow),
-                      onPressed: () => onPlayAudio(surahNumber, ayahNumber),
-                      tooltip: 'Listen',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.favorite_border),
-                      onPressed: () => onToggleFavorite(surahNumber, ayahNumber),
-                      tooltip: 'Add to favorites',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.share),
-                      onPressed: () => onShare(surahNumber, ayahNumber, arabicText, translationText),
-                      tooltip: 'Share',
-                    ),
+                    if (onPlayAudio != null && surahNumber != null)
+                      IconButton(
+                        icon: const Icon(Icons.play_arrow),
+                        onPressed: () => onPlayAudio!(surahNumber!, ayahNumber),
+                        tooltip: 'Play Audio',
+                      ),
+                    if (onToggleFavorite != null && surahNumber != null)
+                      IconButton(
+                        icon: const Icon(Icons.favorite_border),
+                        onPressed: () => onToggleFavorite!(surahNumber!, ayahNumber),
+                        tooltip: 'Add to Favorites',
+                      ),
+                    if (onShare != null)
+                      IconButton(
+                        icon: const Icon(Icons.share),
+                        onPressed: () => onShare!(
+                          surahNumber ?? 0,
+                          ayahNumber,
+                          arabicText,
+                          translationText,
+                        ),
+                        tooltip: 'Share',
+                      ),
                   ],
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            if (showArabic) ...[
+            if (showArabic && arabicText.isNotEmpty) ...[
               Directionality(
                 textDirection: TextDirection.rtl,
                 child: Text(

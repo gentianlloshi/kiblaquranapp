@@ -5,13 +5,37 @@ A comprehensive Islamic prayer application in Albanian language with Qibla direc
 ## Features
 
 - **Qibla Direction**: Find the direction of the Kaaba from your current location
+  - Works offline with fallback to default Albanian location
+  - Compass calibration for accurate readings
 - **Prayer Times**: Get accurate prayer times based on your location with notifications
+  - Multiple calculation methods supported
+  - Automatic fallback to Albanian location when GPS unavailable
 - **Duas (Islamic Supplications)**: Collection of Islamic supplications in Albanian
 - **Mosque Finder**: Locate nearby mosques using Google Maps integration
 - **Quran Reader**: Read the Quran with Arabic text, transliteration, and translation
-  - Audio playback of verses
+  - Audio playback of individual verses
+  - Sequential surah playback with auto-scrolling and highlighting
   - Favorite marking functionality
   - Share verses with others
+  - Toggle display options (Arabic, transliteration, translation)
+  - Advanced transliteration with proper diacritical marks
+  - Multiple Albanian translations supported
+
+## Recent Updates
+
+### Version 1.3.0 (June 2025)
+- **Enhanced Quran Audio Playback**: Added sequential surah playback with auto-scrolling
+- **Improved Audio Experience**: Fixed audio playback issues and added better transitions
+- **UI Enhancements**: Added highlighting for currently playing ayah
+- **Localization Updates**: Complete Albanian localization for all Quran features
+
+### Version 1.2.0 (June 2025)
+- **Complete Albanian Localization**: All UI elements now available in Albanian
+- **Enhanced Transliteration**: Improved Arabic transliteration with proper diacritical marks
+- **Resilient Location Services**: Added fallback mechanisms for location-based features
+- **UI Improvements**: Fixed bottom navigation bar display issues
+- **Error Handling**: Better handling of edge cases and missing data
+- **Performance Optimizations**: Improved app loading and response times
 
 ## Technology Stack
 
@@ -36,10 +60,11 @@ lib/
 │   ├── models/     # Data models
 │   ├── repositories/ # Repository classes
 │   └── services/   # Service classes
-└── presentation/   # UI layer
-    ├── screens/    # App screens
-    ├── widgets/    # Reusable widgets
-    └── providers/  # State management
+├── presentation/   # UI layer
+│   ├── screens/    # App screens
+│   ├── widgets/    # Reusable widgets
+│   └── providers/  # State management
+└── utils/          # Utility classes including translations
 ```
 
 ## Getting Started
@@ -69,7 +94,7 @@ The release APK will be available at `build/app/outputs/flutter-apk/app-release.
 
 The application supports:
 - Albanian (primary)
-- English
+- English (partial support)
 
 ## License
 

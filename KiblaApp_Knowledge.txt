@@ -1,0 +1,138 @@
+Kibla App: Technical & Feature Overview
+======================================
+
+General Description:
+--------------------
+Kibla is a Flutter-based Islamic prayer app. It includes features for Qibla direction, prayer times, Quran reading with translations and transliterations, location services, and more. The app is designed for Albanian users and features a fully translated UI.
+
+Key Features:
+-------------
+1. **Quran Reader**
+   - Home screen for browsing surahs (QuranHomeScreen)
+   - Detail screen for viewing individual surahs (SurahDetailScreen)
+   - Displays Arabic text, transliteration, and translation (toggleable)
+   - Individual ayah audio playback using just_audio
+   - Sequential surah playback with auto-scrolling and highlighting
+   - Favorites and Share functionality
+   - Uses AyahWidget for verses, AudioPlayerWidget for audio
+   - SurahPlaybackController manages sequential playback
+   - QuranRepository manages data access and preferences
+   - QuranProvider handles state management
+
+2. **Qibla Direction & Location**
+   - Uses flutter_compass and geolocator
+   - Fallback to default Albanian location (Tirana) if location is unavailable
+   - Prompts user to enable location services
+   - Handles timeouts and errors gracefully
+
+3. **Prayer Times**
+   - Calculates prayer times based on user location
+   - Falls back to default data if geolocation fails
+   - Optimized for Albanian cities
+
+4. **UI/UX**
+   - Full Albanian translation (AppTranslations class)
+   - Bottom navigation bar with custom styling and active tab highlighting
+   - Toggle controls for Arabic, transliteration, and translation display
+   - User-friendly error states and messages
+   - Proper font and size controls for Quran text
+
+Technical Stack:
+----------------
+- Flutter SDK >=3.0.0 <4.0.0
+- Key packages: flutter_compass, geolocator, just_audio, provider, shared_preferences, sqflite, share_plus
+- Data stored in assets/data (arabic_quran.json, translations, transliterations.json)
+- Uses robust async loading and fallback mechanisms for asset data
+
+Quran Data Loading & Transliteration:
+------------------------------------
+- QuranService loads Arabic Quran, translations, and transliterations from JSON assets
+- Handles both pre-loaded transliterations (from transliterations.json) and generates them dynamically if missing
+- Transliteration system includes:
+  - Diacritical marks (ḥ, ṣ, ḍ, ṭ, ẓ, ʿ)
+  - Vowel marks (fatha, damma, kasra)
+  - Shadda (consonant doubling)
+- All loading is async with error handling and fallback placeholder data
+- Translation IDs are now standardized to use underscore notation (e.g., sq_ahmeti)
+
+Quran Audio Playback System:
+---------------------------
+- **Individual Ayah Playback**
+  - AudioPlayerWidget handles individual ayah playback
+  - Uses just_audio package with UrlSource for remote audio
+  - Disables loop mode to prevent infinite playback
+  - Shows loading state and error messages
+  - Fetches audio URLs dynamically from QuranAudioService
+
+- **Sequential Surah Playback**
+  - SurahPlaybackController manages playback of entire surahs
+  - Features:
+    - Auto-scrolling to currently playing ayah
+    - Visual highlighting of current ayah
+    - Play/pause/resume controls
+    - Smooth transitions between ayahs
+  - Implements transition state management to prevent skipping
+  - Adds delay between ayahs for natural recitation feel
+  - Detailed logging for troubleshooting
+
+- **Audio Sources**
+  - Primary API: alquran.cloud (https://api.alquran.cloud/v1/ayah/{surah}:{ayah}/{reciter})
+  - Fallback API: quranapi.pages.dev (https://quranapi.pages.dev/api/{surah}/{ayah}.json)
+  - Multiple reciters available including Mishary Al-Afasy, Al-Minshawi, Al-Husary
+  - Automatic fallback if primary API fails
+
+- **UI Integration**
+  - "Play Surah" button in SurahDetailScreen
+  - Individual play buttons for each ayah
+  - Visual feedback for currently playing ayah
+  - Fully localized in Albanian language
+
+Recent Bug Fixes & Improvements:
+-------------------------------
+- Fixed translation ID mismatch (dot vs. underscore notation)
+- Fixed SurahDetailScreen loading logic (removed isLoading check, added format compatibility)
+- QuranService now returns transliterations as Map<String, String> (ayah number as key)
+- Enhanced error logging and diagnostics
+- Improved fallback for missing or corrupt JSON assets
+- UI now handles loading and error states more gracefully
+
+Design Decisions:
+-----------------
+- Favor reliability and clarity in data loading over performance optimizations
+- Use fallback placeholders if any Quran data fails to load
+- Ensure all user-facing text is translated and culturally appropriate for Albanian users
+- Provide robust error and state logging for easier diagnostics
+
+Known Limitations & Planned Features:
+-------------------------------------
+- Favorites and Share for Quran ayahs are planned but not fully implemented
+- No persistent caching of loaded Quran data yet (consider for performance)
+- UI/UX can be further polished for accessibility and modern design
+
+Major Quran Feature Changes (June 2025):
+----------------------------------------
+- **Quran JSON Model Mapping:**
+  - Fixed all Quran data loading to support flat JSON with `chapter` and `verse` keys.
+  - Updated `Ayah.fromJson` and `Surah.fromJson` to accept both (`chapter`/`verse` and `number`/`numberInSurah`).
+  - `_transformQuranData` now groups verses by chapter to build Surah objects with correct ayah lists.
+
+- **Audio Playback Improvements:**
+  - Audio is now fetched via remote API (`alquran.cloud` or fallback).
+  - Updated audio service to use `UrlSource(audioUrl)` for remote audio and `AssetSource(audioPath)` for local files.
+  - Audio playback now works for all ayahs streamed from the internet.
+
+- **Translation & Transliteration Fixes:**
+  - Ensured translation IDs use underscore notation consistently (e.g., `sq_ahmeti`).
+  - Transliteration data is now a map keyed by ayah number for UI compatibility.
+
+- **Error Handling & Diagnostics:**
+  - Improved error logging and fallback handling for missing/corrupt assets or failed API calls.
+  - UI now displays clear error states for failed Quran or audio loads.
+
+- **Other UI/UX:**
+  - Surah and ayah counts now display correctly.
+  - Audio controls are fully functional for each verse.
+
+For details on implementation, see `quran_service.dart`, `audio_service.dart`, and related widgets. These changes ensure robust, user-friendly Quran reading and listening for all users.
+
+This file summarizes the core technical and product knowledge about the Kibla App as of 2025-06-01. For deeper details, see the codebase and inline documentation.
