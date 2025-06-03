@@ -1,0 +1,80 @@
+# Kibla App Technical Knowledge Base
+
+## Recent Fixes and Improvements (June 2025)
+
+### 1. Hero Tag Conflicts Resolution
+- **Issue**: Multiple FloatingActionButtons were using the default Hero tag, causing navigation errors
+- **Fix**: Added unique hero tags to FloatingActionButtons:
+  - QiblaScreen: `heroTag: "qibla_calibrate_button"`
+  - MosqueScreen: `heroTag: "mosque_add_button"`
+- **Technical Details**: In Flutter, Hero widgets must have unique tags within a navigation subtree. When multiple FloatingActionButtons exist across different screens, they need explicit unique tags to avoid conflicts.
+
+### 2. Quran Audio Playback Fixes
+- **Issue**: Ayah 2 in Surah Al-Fatiha was being skipped during sequential playback
+- **Fix**: Added special handling for Surah Al-Fatiha in the SurahPlaybackController:
+  - Implemented retry logic specifically for Ayah 2
+  - Increased delay before retry to 2 seconds
+  - Added detailed debug logging
+- **Technical Details**: The error handling in `_playCurrentAyah()` method was modified to detect Surah 1 (Al-Fatiha) and retry Ayah 2 instead of immediately skipping to the next ayah on error.
+
+### 3. Location Service Improvements
+- **Issue**: Location service was returning non-nullable Position objects, causing crashes when location was unavailable
+- **Fix**: Modified LocationService to return nullable Position objects and updated all repositories to handle null values:
+  - QiblaRepository
+  - PrayerRepository
+  - MosqueRepository
+  - DebugScreen
+- **Technical Details**: Added null checks and fallback values in all repositories that consume location data.
+
+### 4. Permission Handling Enhancements
+- **Added**: PermissionUtils class for sequential permission requests
+- **Improved**: User feedback with rationale dialogs and settings prompts
+- **Technical Details**: Uses permission_handler package (v11.4.0) to provide a more robust permission request flow with proper user guidance.
+
+### 5. Error Boundary Improvements
+- **Issue**: ErrorBoundary widget was missing required parameters
+- **Fix**: Added required `sectionName` parameter to all ErrorBoundary usages
+- **Technical Details**: This allows better error isolation and debugging by identifying which section of the app encountered an error.
+
+### 6. Class Naming Conflict Resolution
+- **Issue**: Custom Location class conflicted with the Location class from the geocoding package
+- **Fix**: Renamed the custom Location class to QiblaLocation
+- **Technical Details**: Updated all references to use the new class name and fixed import paths.
+
+## Architecture Notes
+
+### Repository Pattern
+The app follows a repository pattern where:
+- **Repositories** (QiblaRepository, PrayerRepository, etc.) manage business logic and state
+- **Services** (LocationService, CompassService, etc.) handle external interactions
+- **Controllers** (SurahPlaybackController) manage complex UI-related logic
+
+### State Management
+- Uses Provider package for state management
+- Repositories extend ChangeNotifier to provide reactive updates
+
+### Error Handling Strategy
+1. Try to handle errors gracefully with fallbacks
+2. Provide clear user feedback
+3. Use ErrorBoundary widgets to isolate UI errors
+4. Log detailed information in debug mode
+
+### Permission Strategy
+1. Request permissions when needed, not at app startup
+2. Provide clear explanations of why permissions are needed
+3. Offer retry options and settings shortcuts
+4. Graceful fallbacks when permissions are denied
+
+## Known Issues and Future Improvements
+
+### Known Issues
+- Google Maps API key needs to be properly configured for production
+- Compass calibration may be inconsistent on some devices
+- Audio playback may fail with slow internet connections
+
+### Future Improvements
+- Add caching for Quran audio files
+- Implement offline mode for all features
+- Add more translation options
+- Improve accessibility features
+- Add widget tests for critical components

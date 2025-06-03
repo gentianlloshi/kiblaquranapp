@@ -1,9 +1,11 @@
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import '../../../data/repositories/quran_repository.dart';
 import '../../../data/models/surah.dart';
-import 'surah_detail_screen.dart';
-import 'quran_settings_screen.dart';
-import 'quran_favorites_screen.dart';
+import './surah_detail_screen.dart';
+import './quran_settings_screen.dart';
+import './quran_favorites_screen.dart';
+import '../../../utils/translations.dart';
 
 class SurahListScreen extends StatefulWidget {
   final QuranRepository quranRepository;
@@ -18,6 +20,8 @@ class _SurahListScreenState extends State<SurahListScreen> {
   bool _isLoading = true;
   List<Surah> _surahs = [];
   Map<String, dynamic>? _lastRead;
+  String? _error;
+  int _loadAttempts = 0;
 
   @override
   void initState() {
@@ -28,32 +32,80 @@ class _SurahListScreenState extends State<SurahListScreen> {
   Future<void> _initData() async {
     setState(() {
       _isLoading = true;
+      _error = null;
+      _loadAttempts++;
     });
 
     try {
+      developer.log('Initializing SurahListScreen data (attempt $_loadAttempts)...', name: 'SurahListScreen');
+
       // Initialize Quran data if not already loaded
       if (!widget.quranRepository.isDataLoaded) {
+        developer.log('Repository not initialized, initializing now...', name: 'SurahListScreen');
         await widget.quranRepository.initialize();
+      } else {
+        developer.log('Repository already initialized', name: 'SurahListScreen');
       }
 
-      // Get all surahs
-      final surahs = widget.quranRepository.getAllSurahs();
+      // Get all surahs with better error handling
+      List<Surah> surahs = [];
+      try {
+        surahs = widget.quranRepository.getAllSurahs();
+        developer.log('Got ${surahs.length} surahs', name: 'SurahListScreen');
+
+        if (surahs.isEmpty && _loadAttempts < 3) {
+          // Try to reinitialize if no surahs were loaded
+          developer.log('No surahs loaded, retrying initialization...', name: 'SurahListScreen');
+          await Future.delayed(const Duration(milliseconds: 500));
+          return _initData(); // Recursive retry
+        }
+      } catch (e, stack) {
+        developer.log('Error getting surahs: $e', name: 'SurahListScreen', error: e, stackTrace: stack);
+
+        if (_loadAttempts < 3) {
+          // Retry on error
+          await Future.delayed(const Duration(seconds: 1));
+          return _initData(); // Recursive retry
+        }
+
+        // Create a placeholder surah list for debugging after max retries
+        surahs = [
+          Surah(number: 1, name: 'Error Loading', englishName: 'Error', ayahs: []),
+          Surah(number: 2, name: 'Please Restart App', englishName: 'Restart', ayahs: []),
+        ];
+      }
 
       // Get last read position
-      final lastRead = await widget.quranRepository.getLastReadPosition();
+      Map<String, dynamic>? lastRead;
+      try {
+        lastRead = await widget.quranRepository.getLastReadPosition();
+        developer.log('Last read position loaded', name: 'SurahListScreen');
+      } catch (e) {
+        developer.log('Error loading last read position: $e', name: 'SurahListScreen', error: e);
+        lastRead = null;
+      }
 
-      setState(() {
-        _surahs = surahs;
-        _lastRead = lastRead;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading Quran data: $e')),
-      );
+      if (mounted) {
+        setState(() {
+          _surahs = surahs;
+          _lastRead = lastRead;
+          _isLoading = false;
+          _error = surahs.isEmpty ? 'No surahs found. Please restart the app.' : null;
+        });
+        developer.log('State updated with ${_surahs.length} surahs', name: 'SurahListScreen');
+      }
+    } catch (e, stack) {
+      developer.log('Critical error in _initData: $e', name: 'SurahListScreen', error: e, stackTrace: stack);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to load Quran data: $e';
+          // Create a placeholder surah list for debugging
+          _surahs = [
+            Surah(number: 1, name: 'Error: $e', englishName: 'Error', ayahs: []),
+          ];
+        });
+      }
     }
   }
 
@@ -61,7 +113,7 @@ class _SurahListScreenState extends State<SurahListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kurani Fisnik'),
+        title: const Text(AppTranslations.browseQuran),
         actions: [
           IconButton(
             icon: const Icon(Icons.favorite),
@@ -99,31 +151,45 @@ class _SurahListScreenState extends State<SurahListScreen> {
               children: [
                 if (_lastRead != null)
                   _buildLastReadCard(),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _surahs.length,
-                    itemBuilder: (context, index) {
-                      final surah = _surahs[index];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          child: Text(surah.number.toString()),
-                        ),
-                        title: Text(surah.englishName),
-                        subtitle: Text('${surah.ayahs.length} verses'),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SurahDetailScreen(
-                                surahNumber: surah.number,
-                                quranRepository: widget.quranRepository,
-                              ),
-                            ),
-                          ).then((_) => _checkForUpdates());
-                        },
-                      );
-                    },
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ),
+                Expanded(
+                  child: _surahs.isEmpty
+                      ? const Center(child: Text(AppTranslations.errorLoadingData))
+                      : ListView.builder(
+                          itemCount: _surahs.length,
+                          itemBuilder: (context, index) {
+                            final surah = _surahs[index];
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Theme.of(context).primaryColor,
+                                child: Text(
+                                  surah.number.toString(),
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ),
+                              title: Text('${AppTranslations.chapter} ${surah.number}'),
+                              subtitle: Text('${surah.ayahs.length} ${AppTranslations.verses}'),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => SurahDetailScreen(
+                                      quranRepository: widget.quranRepository,
+                                      surahNumber: surah.number,
+                                    ),
+                                  ),
+                                ).then((_) => _checkForUpdates());
+                              },
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -153,9 +219,9 @@ class _SurahListScreenState extends State<SurahListScreen> {
             context,
             MaterialPageRoute(
               builder: (context) => SurahDetailScreen(
+                quranRepository: widget.quranRepository,
                 surahNumber: surahNumber,
                 initialAyahNumber: ayahNumber,
-                quranRepository: widget.quranRepository,
               ),
             ),
           ).then((_) => _checkForUpdates());

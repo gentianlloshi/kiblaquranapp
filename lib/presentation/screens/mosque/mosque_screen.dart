@@ -167,6 +167,7 @@ class _MosqueScreenState extends State<MosqueScreen> with SingleTickerProviderSt
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: "mosque_add_button",
         onPressed: () {
           _showAddMosqueDialog(context);
         },
@@ -195,13 +196,13 @@ class _MosqueScreenState extends State<MosqueScreen> with SingleTickerProviderSt
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.location_off,
                       size: 80,
                       color: Colors.grey,
                     ),
                     const SizedBox(height: 16),
-                    Text(
+                    const Text(
                       'Nuk mund të merret vendndodhja',
                       textAlign: TextAlign.center,
                     ),
@@ -571,7 +572,7 @@ class _MosqueScreenState extends State<MosqueScreen> with SingleTickerProviderSt
   
   void _shareMosqueLocation(Mosque mosque) {
     final prayerTimesText = mosque.prayerTimes.isNotEmpty
-        ? '\nKohët e faljes:\n' + mosque.prayerTimes.map((p) => '${p.name}: ${p.time}').join('\n')
+        ? '\nKohët e faljes:\n${mosque.prayerTimes.map((p) => '${p.name}: ${p.time}').join('\n')}'
         : '';
         
     final shareText = '''

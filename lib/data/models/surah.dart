@@ -20,11 +20,10 @@ class Surah {
         json['ayahs'].map((ayah) => Ayah.fromJson(ayah)),
       );
     }
-
     return Surah(
-      number: json['number'],
-      name: json['name'],
-      englishName: json['englishName'],
+      number: json['number'] ?? json['chapter'], 
+      name: json['name'] ?? 'Surah',
+      englishName: json['englishName'] ?? 'Surah',
       ayahs: ayahsList,
     );
   }

@@ -48,11 +48,10 @@ android {
         }
 
         create("release") {
-            // Use the same values as debug keystore for simplicity
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            storeFile = file("kibla_app_keystore.jks")
+            storePassword = "6FRq&SJ8"
+            keyAlias = "kibla_app_key"
+            keyPassword = "6FRq&SJ8"
         }
     }
 
@@ -62,6 +61,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled = true  // Enable multidex support
     }
 
     buildTypes {
@@ -90,4 +90,5 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+    implementation("androidx.multidex:multidex:2.0.1")
 }

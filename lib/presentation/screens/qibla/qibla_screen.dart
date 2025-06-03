@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
+import 'package:permission_handler/permission_handler.dart';
 import '../../../data/repositories/qibla_repository.dart';
 import '../../widgets/compass_widget.dart';
+import '../../widgets/error_boundary.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class QiblaScreen extends StatefulWidget {
   const QiblaScreen({Key? key}) : super(key: key);
@@ -14,37 +17,39 @@ class QiblaScreen extends StatefulWidget {
 class _QiblaScreenState extends State<QiblaScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isCalibrating = false;
-  
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     
-    // Initialize location on first load
+    // Request permissions and initialize location when screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final qiblaRepository = Provider.of<QiblaRepository>(context, listen: false);
-      qiblaRepository.initializeLocation();
+      _requestPermissionsAndInitialize();
     });
   }
-  
-  Future<void> _calibrateCompass() async {
-    setState(() {
-      _isCalibrating = true;
-    });
+
+  Future<void> _requestPermissionsAndInitialize() async {
+    final qiblaRepository = Provider.of<QiblaRepository>(context, listen: false);
     
-    // Show calibration UI for 5 seconds
-    await Future.delayed(const Duration(seconds: 5));
+    // Use the new context-aware permission request method
+    final permissionsGranted = await qiblaRepository.requestLocationPermissionsWithContext(context);
     
-    setState(() {
-      _isCalibrating = false;
-    });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Busulla u kalibrua me sukses'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    if (!permissionsGranted) {
+      // Show a snackbar if permissions were denied
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permission is required for accurate Qibla direction'),
+            duration: Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: openAppSettings,
+            ),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -55,74 +60,168 @@ class _QiblaScreenState extends State<QiblaScreen> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<QiblaRepository>(
-      builder: (context, qiblaRepository, child) {
-        final qiblaDirection = qiblaRepository.qiblaDirection ?? 0.0;
-        final location = qiblaRepository.currentLocation;
-        final distance = qiblaRepository.distanceToKaaba;
-        final compassHeading = qiblaRepository.currentHeading;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Drejtimi i Kibles'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Busulla'),
+            Tab(text: 'Precize'),
+            Tab(text: 'Harta'),
+          ],
+          labelStyle: const TextStyle(
+            fontSize: 16.0, 
+            fontWeight: FontWeight.bold,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 14.0,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              final qiblaRepository = Provider.of<QiblaRepository>(context, listen: false);
+              await qiblaRepository.refreshLocation();
+              if (!mounted) return;
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Vendndodhja u rifreskua'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Consumer<QiblaRepository>(
+        builder: (context, qiblaRepository, child) {
+          if (qiblaRepository.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          if (!qiblaRepository.hasLocation) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.location_off, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Location not available',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Please enable location services and grant permission',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    onPressed: () async {
+                      await _requestPermissionsAndInitialize();
+                    },
+                  ),
+                ],
+              ),
+            );
+          }
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Drejtimi i Kibles'),
-            bottom: TabBar(
-              controller: _tabController,
-              tabs: const [
-                Tab(text: 'Busulla'),
-                Tab(text: 'Precize'),
-                Tab(text: 'Harta'),
-              ],
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () async {
-                  await qiblaRepository.refreshLocation();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Vendndodhja u rifreskua'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              // Pamja Standarde (Busulla)
+              ErrorBoundary(
+                sectionName: 'QiblaCompassView',
+                child: _CompassViewWidget(
+                  qiblaDirection: qiblaRepository.qiblaDirection ?? 0.0,
+                ),
+              ),
+
+              // Pamja Precize
+              ErrorBoundary(
+                sectionName: 'QiblaPreciseView',
+                child: _PreciseViewWidget(
+                  qiblaDirection: qiblaRepository.qiblaDirection ?? 0.0,
+                  location: qiblaRepository.currentLocation,
+                ),
+              ),
+              
+              // Pamja me Hartë
+              ErrorBoundary(
+                sectionName: 'QiblaMapView',
+                child: _MapViewWidget(
+                  location: qiblaRepository.currentLocation,
+                  qiblaDirection: qiblaRepository.qiblaDirection ?? 0.0,
+                ),
               ),
             ],
-          ),
-          body: qiblaRepository.isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Pamja Standarde (Busulla)
-                    _buildCompassView(compassHeading, qiblaDirection),
-
-                    // Pamja Precize
-                    _buildPreciseView(qiblaDirection, location, distance),
-                    
-                    // Pamja me Hartë
-                    _buildMapView(location, qiblaDirection),
-                  ],
-                ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: _calibrateCompass,
-            tooltip: 'Kalibro Busullën',
-            child: _isCalibrating
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        heroTag: "qibla_calibrate_button",
+        onPressed: () async {
+          setState(() {
+            _isCalibrating = true;
+          });
+          
+          // Show calibration UI for 5 seconds
+          await Future.delayed(const Duration(seconds: 5));
+          
+          setState(() {
+            _isCalibrating = false;
+          });
+          
+          if (!mounted) return;
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Busulla u kalibrua me sukses'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        },
+        backgroundColor: Colors.blue,
+        child: Consumer<QiblaRepository>(
+          builder: (context, qiblaRepository, child) {
+            return qiblaRepository.isLoading
                 ? const CircularProgressIndicator(color: Colors.white)
-                : const Icon(Icons.compass_calibration),
-          ),
-        );
-      },
+                : const Icon(Icons.compass_calibration);
+          },
+        ),
+      ),
     );
   }
-  
-  Widget _buildCompassView(double direction, double qiblaDirection) {
+}
+
+// Extracted widget for better performance
+class _CompassViewWidget extends StatelessWidget {
+  final double qiblaDirection;
+
+  const _CompassViewWidget({
+    Key? key,
+    required this.qiblaDirection,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CompassWidget(
-            direction: direction,
-            qiblaDirection: qiblaDirection,
+          // Use Consumer only for the compass widget to minimize rebuilds
+          Consumer<QiblaRepository>(
+            builder: (context, qiblaRepository, child) {
+              return CompassWidget(
+                direction: qiblaRepository.currentHeading,
+                qiblaDirection: qiblaDirection,
+              );
+            },
           ),
           const SizedBox(height: 20),
           Text(
@@ -135,12 +234,35 @@ class _QiblaScreenState extends State<QiblaScreen> with SingleTickerProviderStat
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey),
           ),
+          if (kDebugMode)
+            Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: Consumer<QiblaRepository>(
+                builder: (context, repo, _) => Text(
+                  'Compass update rate: ${(1000 / repo.compassUpdateInterval).toStringAsFixed(1)} Hz',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
-  
-  Widget _buildPreciseView(double qiblaDirection, Location? location, double distance) {
+}
+
+// Extracted widget for better performance
+class _PreciseViewWidget extends StatelessWidget {
+  final double qiblaDirection;
+  final QiblaLocation? location;
+
+  const _PreciseViewWidget({
+    Key? key,
+    required this.qiblaDirection,
+    this.location,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -193,7 +315,7 @@ class _QiblaScreenState extends State<QiblaScreen> with SingleTickerProviderStat
                       const Icon(Icons.place, color: Colors.red),
                       const SizedBox(width: 8),
                       Text(
-                        'Distanca nga vendndodhja juaj: ${distance.toStringAsFixed(1)} km',
+                        'Distanca nga vendndodhja juaj: ${location?.distanceToKaaba.toStringAsFixed(1)} km',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ],
@@ -249,8 +371,26 @@ class _QiblaScreenState extends State<QiblaScreen> with SingleTickerProviderStat
       ),
     );
   }
-  
-  Widget _buildMapView(Location? location, double qiblaDirection) {
+}
+
+// Extracted widget for better performance
+class _MapViewWidget extends StatefulWidget {
+  final QiblaLocation? location;
+  final double qiblaDirection;
+
+  const _MapViewWidget({
+    Key? key,
+    required this.location,
+    required this.qiblaDirection,
+  }) : super(key: key);
+
+  @override
+  State<_MapViewWidget> createState() => _MapViewWidgetState();
+}
+
+class _MapViewWidgetState extends State<_MapViewWidget> {
+  @override
+  Widget build(BuildContext context) {
     // In a real app, this would be a Google Map or other map implementation
     // For now, just show a placeholder
     return Center(
@@ -261,9 +401,9 @@ class _QiblaScreenState extends State<QiblaScreen> with SingleTickerProviderStat
           const SizedBox(height: 20),
           const Text('Harta do të implementohet së shpejti'),
           const SizedBox(height: 20),
-          if (location != null) Text('Qyteti: ${location.city}'),
-          Text('Drejtimi i Kibles: ${qiblaDirection.toStringAsFixed(1)}°'),
-          Text('Distanca deri në Qabe: ${location != null ? "${Provider.of<QiblaRepository>(context, listen: false).distanceToKaaba.toStringAsFixed(1)} km" : "Duke llogaritur..."}'),
+          if (widget.location != null) Text('Qyteti: ${widget.location!.city ?? "Duke marrë..."}'),
+          Text('Drejtimi i Kibles: ${widget.qiblaDirection.toStringAsFixed(1)}°'),
+          Text('Distanca deri në Qabe: ${widget.location?.distanceToKaaba.toStringAsFixed(1)} km'),
         ],
       ),
     );

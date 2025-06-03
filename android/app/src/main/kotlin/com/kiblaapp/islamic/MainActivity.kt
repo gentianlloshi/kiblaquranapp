@@ -1,4 +1,4 @@
-package com.example.kibla_app_new
+package com.kiblaapp.islamic
 
 import io.flutter.embedding.android.FlutterActivity
 

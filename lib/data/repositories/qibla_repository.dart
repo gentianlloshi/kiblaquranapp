@@ -1,34 +1,29 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-
 import '../services/location_service.dart';
 import '../services/compass_service.dart';
-
-class Location {
-  final double latitude;
-  final double longitude;
-  final String? city;
-
-  Location({
-    required this.latitude,
-    required this.longitude,
-    this.city,
-  });
-}
+import '../../utils/permission_utils.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class QiblaRepository extends ChangeNotifier {
   final LocationService _locationService;
   final CompassService _compassService;
 
-  Location? _currentLocation;
+  QiblaLocation? _currentLocation;
   double? _qiblaDirection;
   double _distanceToKaaba = 0;
   bool _isLoading = false;
+  bool _isInitializing = false;
   StreamSubscription<double>? _compassSubscription;
   double _currentHeading = 0;
+  
+  // Performance monitoring
+  DateTime? _lastCompassUpdate;
+  double _compassUpdateInterval = 0;
 
   // Kaaba coordinates
   static const double kaabaLat = 21.4225;
@@ -36,98 +31,175 @@ class QiblaRepository extends ChangeNotifier {
 
   QiblaRepository(this._locationService, this._compassService) {
     _listenToCompass();
+    initializeLocation();
   }
-
-  Location? get currentLocation => _currentLocation;
-  double? get qiblaDirection => _qiblaDirection;
-  double get distanceToKaaba => _distanceToKaaba;
-  bool get isLoading => _isLoading;
-  double get currentHeading => _currentHeading;
 
   void _listenToCompass() {
     final compassStream = _compassService.compassStream;
-    if (compassStream != null) {
-      _compassSubscription = compassStream.listen((heading) {
+    _compassSubscription?.cancel();
+    _compassSubscription = compassStream.listen(
+      (heading) {
+        // Calculate update interval for performance monitoring
+        final now = DateTime.now();
+        if (_lastCompassUpdate != null) {
+          _compassUpdateInterval = now.difference(_lastCompassUpdate!).inMilliseconds.toDouble();
+        }
+        _lastCompassUpdate = now;
+        
         _currentHeading = heading;
         notifyListeners();
-      });
-    }
+      },
+      onError: (e) {
+        if (kDebugMode) {
+          print('❌ Error in compass stream: $e');
+        }
+      }
+    );
   }
 
-  Future<void> initializeLocation() async {
-    if (_isLoading) return;
-
+  Future<bool> initializeLocation() async {
+    if (_isInitializing) return false;
+    
+    _isInitializing = true;
     _isLoading = true;
     notifyListeners();
-
+    
     try {
-      // Special handling for web platforms
-      if (kIsWeb) {
-        // On web, use default values since geolocation permissions can be complex
-        debugPrint('Running on web platform: using mock location data for Qibla');
-        _currentLocation = Location(
-          latitude: 41.3275, // Default location (Tirana, Albania)
-          longitude: 19.8187,
-          city: 'Tiranë',
-        );
-
-        _calculateQiblaDirection();
-        _calculateDistanceToKaaba();
-
+      // Request permissions using PermissionUtils
+      final permissionsGranted = await _requestLocationPermissions();
+      
+      if (!permissionsGranted) {
         _isLoading = false;
+        _isInitializing = false;
         notifyListeners();
-        return;
+        return false;
       }
 
-      // Normal flow for mobile platforms
-      final position = await _locationService.getCurrentLocation();
-      _currentLocation = Location(
-        latitude: position.latitude,
-        longitude: position.longitude,
-        city: await _locationService.getCityName(position),
-      );
-
-      _calculateQiblaDirection();
-      _calculateDistanceToKaaba();
-    } catch (e) {
-      debugPrint('Error initializing location: $e');
-    } finally {
+      // Get current location
+      await _updateLocation();
+      
       _isLoading = false;
+      _isInitializing = false;
       notifyListeners();
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error initializing location: $e');
+      }
+      _isLoading = false;
+      _isInitializing = false;
+      notifyListeners();
+      return false;
     }
   }
 
-  Future<void> refreshLocation() async {
-    await initializeLocation();
+  Future<void> _updateLocation() async {
+    try {
+      final position = await _locationService.getCurrentLocation();
+      
+      if (position != null) {
+        // Get city name if possible
+        String? cityName;
+        try {
+          cityName = await _locationService.getCityName(position.latitude, position.longitude);
+        } catch (e) {
+          developer.log('Error getting city name: $e', name: 'QiblaRepository');
+        }
+        
+        _currentLocation = QiblaLocation(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          altitude: position.altitude,
+          accuracy: position.accuracy,
+          city: cityName,
+          distanceToKaaba: _calculateDistanceToKaaba(position.latitude, position.longitude),
+        );
+        _calculateQiblaDirection();
+      }
+    } catch (e) {
+      developer.log('Error updating location: $e', name: 'QiblaRepository');
+    }
+  }
+
+  Future<bool> _requestLocationPermissions() async {
+    // Check if we can request permissions (requires a BuildContext)
+    final locationStatus = await Permission.locationWhenInUse.status;
+    
+    // If already granted, return true
+    if (locationStatus.isGranted) {
+      return true;
+    }
+    
+    // Otherwise, request directly (without UI context)
+    final result = await Permission.locationWhenInUse.request();
+    return result.isGranted;
+  }
+
+  /// Request location permissions with proper UI context
+  Future<bool> requestLocationPermissionsWithContext(BuildContext context) async {
+    final permissions = [Permission.locationWhenInUse];
+    final rationales = {
+      Permission.locationWhenInUse: 'Qibla direction requires location access to calculate the direction to Mecca based on your current position.',
+    };
+    
+    final results = await PermissionUtils.requestPermissionsSequentially(
+      context: context,
+      permissions: permissions,
+      rationales: rationales,
+    );
+    
+    // Check if all permissions were granted
+    return results.values.every((granted) => granted);
   }
 
   void _calculateQiblaDirection() {
     if (_currentLocation == null) return;
-
+    
     final lat1 = _currentLocation!.latitude * (math.pi / 180);
     final lon1 = _currentLocation!.longitude * (math.pi / 180);
-    const lat2 = kaabaLat * (math.pi / 180);
-    const lon2 = kaabaLng * (math.pi / 180);
-
+    final lat2 = kaabaLat * (math.pi / 180);
+    final lon2 = kaabaLng * (math.pi / 180);
+    
     final y = math.sin(lon2 - lon1) * math.cos(lat2);
-    final x = math.cos(lat1) * math.sin(lat2) -
-        math.sin(lat1) * math.cos(lat2) * math.cos(lon2 - lon1);
-
-    var qibla = math.atan2(y, x);
-    qibla = qibla * (180 / math.pi);
-    _qiblaDirection = (qibla + 360) % 360; // Normalize to 0-360°
+    final x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(lon2 - lon1);
+    final bearing = math.atan2(y, x);
+    
+    _qiblaDirection = (bearing * (180 / math.pi) + 360) % 360;
+    notifyListeners();
   }
 
-  void _calculateDistanceToKaaba() {
-    if (_currentLocation == null) return;
-
-    // Calculate distance using Haversine formula
-    _distanceToKaaba = Geolocator.distanceBetween(
-      _currentLocation!.latitude,
-      _currentLocation!.longitude,
+  double _calculateDistanceToKaaba(double lat1, double lon1) {
+    return _locationService.calculateDistance(
+      lat1,
+      lon1,
       kaabaLat,
       kaabaLng,
-    ) / 1000; // Convert meters to kilometers
+    );
+  }
+
+  // Getters
+  QiblaLocation? get currentLocation => _currentLocation;
+  double? get qiblaDirection => _qiblaDirection;
+  double get distanceToKaaba => _currentLocation?.distanceToKaaba ?? 0;
+  bool get isLoading => _isLoading;
+  bool get isInitializing => _isInitializing;
+  double get currentHeading => _currentHeading;
+  double get compassUpdateInterval => _compassUpdateInterval;
+  bool get hasLocation => _currentLocation != null;
+  
+  // Method to refresh location data
+  Future<void> refreshLocation() async {
+    if (_isLoading) return;
+    
+    _isLoading = true;
+    notifyListeners();
+    
+    try {
+      await _updateLocation();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   @override
@@ -135,4 +207,25 @@ class QiblaRepository extends ChangeNotifier {
     _compassSubscription?.cancel();
     super.dispose();
   }
+}
+
+class QiblaLocation {
+  final double latitude;
+  final double longitude;
+  final double? altitude;
+  final double? accuracy;
+  final String? city;
+  double distanceToKaaba;
+  
+  QiblaLocation({
+    required this.latitude,
+    required this.longitude,
+    this.altitude,
+    this.accuracy,
+    this.city,
+    this.distanceToKaaba = 0,
+  });
+  
+  @override
+  String toString() => 'QiblaLocation(lat: $latitude, lng: $longitude)';
 }

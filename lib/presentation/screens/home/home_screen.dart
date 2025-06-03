@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:hijri/hijri_calendar.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/prayer_repository.dart';
 import '../../../data/repositories/qibla_repository.dart';
 import '../../../data/repositories/dua_repository.dart';
+import '../../../main.dart';
+import '../debug/debug_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -32,6 +35,9 @@ class _HomeScreenState extends State<HomeScreen> {
       qiblaRepository.initializeLocation();
       duaRepository.fetchDailyDua();
       duaRepository.fetchDailyVerse();
+
+      // Log app initialization for debugging purposes
+      addDebugLog("Home screen initialized and repositories updated");
     });
   }
   
@@ -129,6 +135,18 @@ class _HomeScreenState extends State<HomeScreen> {
           },
           tooltip: 'Rifresko vendndodhjen',
         ),
+        if (kDebugMode)
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const DebugScreen(),
+                ),
+              );
+            },
+            tooltip: 'Debug',
+          ),
       ],
     );
   }
@@ -277,49 +295,58 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   
   Widget _buildPrayerTimes() {
-    return Consumer<PrayerRepository>(
-      builder: (context, prayerRepository, child) {
-        final nextPrayer = prayerRepository.nextPrayer;
-        final timeUntilNextPrayer = prayerRepository.timeUntilNextPrayer;
-        
-        return Card(
-          elevation: 2,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Kohët e Faljes',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (nextPrayer != null)
-                  ListTile(
-                    leading: const Icon(Icons.access_time),
-                    title: Text('Falja e radhës: ${nextPrayer.name}'),
-                    subtitle: Text(timeUntilNextPrayer ?? 'Duke ngarkuar...'),
-                    trailing: Text(
-                      DateFormat('HH:mm').format(nextPrayer.time),
-                      style: Theme.of(context).textTheme.titleMedium,
+    // Wrap with Builder to ensure a fresh context that doesn't try to access DefaultTabController
+    return Builder(
+      builder: (BuildContext context) {
+        return Consumer<PrayerRepository>(
+          builder: (context, prayerRepository, child) {
+            final nextPrayer = prayerRepository.nextPrayer;
+            final timeUntilNextPrayer = prayerRepository.timeUntilNextPrayer;
+            
+            return Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Kohët e Faljes',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: () {
-                    // Navigate to prayer times page
-                    DefaultTabController.of(context).animateTo(2);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 40),
-                  ),
-                  child: const Text('Shiko të gjitha kohët e faljes'),
+                    const SizedBox(height: 16),
+                    if (nextPrayer != null)
+                      ListTile(
+                        leading: const Icon(Icons.access_time),
+                        title: Text('Falja e radhës: ${nextPrayer.name}'),
+                        subtitle: Text(timeUntilNextPrayer ?? 'Duke ngarkuar...'),
+                        trailing: Text(
+                          DateFormat('HH:mm').format(nextPrayer.time),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        // Navigate to prayer times page using index navigation instead of TabController
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (context) => const MainScreen(initialIndex: 2),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 40),
+                      ),
+                      child: const Text('Shiko të gjitha kohët e faljes'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );

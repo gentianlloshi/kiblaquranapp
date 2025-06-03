@@ -7,6 +7,7 @@ import '../../widgets/quran/ayah_widget.dart';
 import '../../widgets/quran/audio_player_widget.dart';
 import '../../../utils/translations.dart';
 import '../../../data/controllers/surah_playback_controller.dart';
+import '../../../data/services/quran_audio_service.dart';
 
 class SurahDetailScreen extends StatefulWidget {
   final int surahNumber;
@@ -122,10 +123,17 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
               surahNumber: widget.surahNumber,
               totalAyahs: _arabicSurah!.ayahs.length,
               onAyahChange: (ayahNumber) {
-                setState(() {
-                  _currentPlayingAyah = ayahNumber;
-                });
-                _scrollToAyah(ayahNumber);
+                if (mounted) {
+                  setState(() {
+                    _currentPlayingAyah = ayahNumber;
+                    _isPlayingSurah = true; // Ensure this is set to true when ayahs change
+                  });
+                  // Make sure to always scroll to the ayah being played
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _scrollToAyah(ayahNumber);
+                  });
+                  debugPrint('Updated current playing ayah to: $ayahNumber');
+                }
               },
             );
           }
@@ -159,7 +167,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
 
       if (ayahIndex >= 0) {
         // Calculate approximate position (this is an estimate)
-        final estimatedItemHeight = 200.0; // Adjust based on your actual item height
+        const estimatedItemHeight = 200.0; // Adjust based on your actual item height
         final offset = ayahIndex * estimatedItemHeight;
         
         _scrollController.animateTo(
@@ -174,18 +182,28 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
   void _toggleSurahPlayback() {
     if (_playbackController == null || _arabicSurah == null) return;
     
-    setState(() {
-      if (_isPlayingSurah) {
-        _playbackController!.pausePlayback();
+    if (_isPlayingSurah) {
+      if (_playbackController!.isPaused) {
+        // If already paused, resume playback
+        _playbackController!.resumePlayback();
+        setState(() {
+          _isPlayingSurah = true;
+        });
       } else {
-        if (_currentPlayingAyah > 0) {
-          _playbackController!.resumePlayback();
-        } else {
-          _playbackController!.startPlayback();
-        }
+        // If playing, pause playback
+        _playbackController!.pausePlayback();
+        setState(() {
+          _isPlayingSurah = true; // Keep it true so we know it's paused, not stopped
+        });
       }
-      _isPlayingSurah = !_isPlayingSurah;
-    });
+    } else {
+      // Start new playback
+      _playbackController!.startPlayback();
+      setState(() {
+        _isPlayingSurah = true;
+        _currentPlayingAyah = 1; // Initialize with first ayah when starting playback
+      });
+    }
   }
 
   @override
@@ -233,7 +251,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadSurahData,
-              child: Text(AppTranslations.tryAgain),
+              child: const Text(AppTranslations.tryAgain),
             ),
           ],
         ),
@@ -241,7 +259,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
     }
 
     if (_arabicSurah == null || _arabicSurah!.ayahs.isEmpty) {
-      return Center(
+      return const Center(
         child: Text(AppTranslations.noDataAvailable),
       );
     }
@@ -260,7 +278,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
                   children: [
                     Text(
                       _isPlayingSurah 
-                          ? '${AppTranslations.playingAyah} ${_currentPlayingAyah}/${_arabicSurah!.ayahs.length}'
+                          ? '${AppTranslations.playingAyah} $_currentPlayingAyah/${_arabicSurah!.ayahs.length}'
                           : AppTranslations.playSurah,
                       style: const TextStyle(
                         fontSize: 16,
@@ -327,6 +345,9 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
                         _isPlayingSurah = false;
                       });
                     }
+
+                    // Now play the individual ayah
+                    _playIndividualAyah(surahNumber, ayahNumber);
                   },
                   onToggleFavorite: _toggleFavorite,
                   onShare: _shareAyah,
@@ -343,13 +364,13 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(AppTranslations.displayOptions),
+        title: const Text(AppTranslations.displayOptions),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Show Arabic text option
             SwitchListTile(
-              title: Text(AppTranslations.showArabic),
+              title: const Text(AppTranslations.showArabic),
               value: _showArabic,
               onChanged: (value) {
                 setState(() {
@@ -362,7 +383,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
             
             // Show transliteration option
             SwitchListTile(
-              title: Text(AppTranslations.showTransliteration),
+              title: const Text(AppTranslations.showTransliteration),
               value: _showTransliteration,
               onChanged: (value) {
                 setState(() {
@@ -375,7 +396,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
             
             // Show translation option
             SwitchListTile(
-              title: Text(AppTranslations.showTranslation),
+              title: const Text(AppTranslations.showTranslation),
               value: _showTranslation,
               onChanged: (value) {
                 setState(() {
@@ -390,7 +411,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(AppTranslations.close),
+            child: const Text(AppTranslations.close),
           ),
         ],
       ),
@@ -402,7 +423,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
     // Show a snackbar or some other feedback
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppTranslations.favoriteToggled)),
+        const SnackBar(content: Text(AppTranslations.favoriteToggled)),
       );
     }
   }
@@ -421,5 +442,55 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
     
     final text = 'Surah $surahName ($surahNumber)\nTotal Ayahs: $totalAyahs\n\nShared from Kibla App';
     await Share.share(text);
+  }
+
+  // Play individual ayah
+  Future<void> _playIndividualAyah(int surahNumber, int ayahNumber) async {
+    // Import the necessary widget
+    try {
+      // Get the URL from the audio service
+      final QuranAudioService audioService = QuranAudioService();
+      final String audioUrl = await audioService.getVerseAudioUrl(surahNumber, ayahNumber);
+
+      // Show a player modal or bottom sheet
+      if (mounted) {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          builder: (context) => Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  AppTranslations.nowPlaying,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text('Surah $surahNumber, Ayah $ayahNumber'),
+                const SizedBox(height: 16),
+                // This imports the audio player widget from our project
+                AudioPlayerWidget(
+                  audioUrl: audioUrl,
+                  surahNumber: surahNumber,
+                  ayahNumber: ayahNumber,
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error playing individual ayah: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${AppTranslations.errorPlayingAudio}: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

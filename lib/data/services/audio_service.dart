@@ -29,7 +29,11 @@ class AudioService {
         await _audioPlayer.resume();
       } else {
         // Otherwise play the new audio
-        await _audioPlayer.play(AssetSource(audioPath));
+        if (audioPath.startsWith('http')) {
+          await _audioPlayer.play(UrlSource(audioPath));
+        } else {
+          await _audioPlayer.play(AssetSource(audioPath));
+        }
         _currentlyPlaying = audioPath;
       }
     } catch (e) {

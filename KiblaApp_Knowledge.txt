@@ -133,6 +133,41 @@ Major Quran Feature Changes (June 2025):
   - Surah and ayah counts now display correctly.
   - Audio controls are fully functional for each verse.
 
+Audio Playback System Overhaul (June 2025):
+------------------------------------------
+- **Single-Instance Audio Player Architecture:**
+  - Completely redesigned SurahPlaybackController to use a single AudioPlayer instance for the entire surah
+  - Implemented ConcatenatingAudioSource for playlist-based playback rather than creating/destroying player for each ayah
+  - Eliminated the performance overhead of reinitializing codecs for each ayah, resolving the ayah skipping issue
+  - All ayahs now play sequentially without skipping (including Surah Al-Fatiha Ayah 2)
+
+- **UI Synchronization Improvements:**
+  - Fixed SurahDetailScreen to properly update the UI as ayahs change during playback
+  - Added post-frame callbacks to ensure smooth scrolling to the currently playing ayah
+  - Fixed "0/286" display issue by correctly initializing current ayah number when starting playback
+  - Enhanced state management for play/pause/resume functionality with proper UI feedback
+
+- **Streaming Audio Optimizations:**
+  - Audio sources are now pre-loaded into a playlist at initialization time
+  - Improved buffering by creating all audio sources at once rather than on-demand
+  - Added comprehensive error handling with automatic retry logic for failed audio sources
+  - UI state now properly reflects loading/buffering states during playback
+
+- **Performance Monitoring:**
+  - Added detailed logging for audio player state changes and transitions
+  - Implemented debugging hooks to track ayah changes and audio loading
+  - Improved error handling and logging for API failures during audio retrieval
+
+- **Other UI/UX Enhancements:**
+  - Fixed individual ayah playback in modal bottom sheet
+  - Added visual feedback when audio is playing with current ayah highlighting
+  - Consistent pause/play button behavior across entire app
+  - Improved handling of playback state during screen rotations and UI rebuilds
+
+This represents a fundamental shift from the previous approach of creating separate audio player instances for each ayah to a more efficient, playlist-based architecture that maintains a single player instance. This architecture significantly improves performance, reduces resource usage, and eliminates the ayah skipping issues previously observed.
+
+For implementation details, see `surah_playback_controller.dart` and `surah_detail_screen.dart`.
+
 For details on implementation, see `quran_service.dart`, `audio_service.dart`, and related widgets. These changes ensure robust, user-friendly Quran reading and listening for all users.
 
 This file summarizes the core technical and product knowledge about the Kibla App as of 2025-06-01. For deeper details, see the codebase and inline documentation.

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:flutter_compass/flutter_compass.dart';
-import 'package:flutter/foundation.dart';
 
 class CompassService {
   // Stream controller to manage the heading data
@@ -13,11 +12,6 @@ class CompassService {
   bool _compassSensorWorking = false;
   DateTime? _lastRealCompassUpdate;
   StreamSubscription? _compassSubscription;
-  
-  // Throttling variables
-  DateTime _lastEmittedTime = DateTime.now();
-  double _lastHeading = 0;
-  static const throttleDuration = Duration(milliseconds: 100); // Throttle to 10 updates per second
 
   CompassService() {
     _initializeCompass();
@@ -34,29 +28,19 @@ class CompassService {
         return;
       }
 
-      // Listen to compass events with throttling
+      // Listen to compass events
       _compassSubscription = FlutterCompass.events!.listen(
         (CompassEvent event) {
           if (event.heading != null) {
             _lastRealCompassUpdate = DateTime.now();
             _compassSensorWorking = true;
-            
-            // Apply throttling - only emit if significant change or enough time has passed
-            final now = DateTime.now();
-            final timeDiff = now.difference(_lastEmittedTime);
-            final headingDiff = (_lastHeading - (event.heading ?? 0)).abs();
-            
-            if (timeDiff > throttleDuration || headingDiff > 1.0) {
-              _lastEmittedTime = now;
-              _lastHeading = event.heading!;
-              _headingController.add(event.heading!);
-            }
+            _headingController.add(event.heading!);
           } else {
             developer.log("Received null heading", name: 'CompassService');
           }
         },
         onError: (e) {
-          developer.log("Error from compass", name: 'CompassService', error: e);
+          developer.log("Error from compass: $e", name: 'CompassService', error: e);
           _compassSensorWorking = false;
           _startFallbackCompass();
         },
@@ -70,7 +54,7 @@ class CompassService {
 
       developer.log("Compass initialized successfully", name: 'CompassService');
     } catch (e) {
-      developer.log("Failed to initialize compass", name: 'CompassService', error: e);
+      developer.log("Failed to initialize compass: $e", name: 'CompassService', error: e);
       _startFallbackCompass();
     }
   }
@@ -95,8 +79,8 @@ class CompassService {
     // Cancel real compass subscription if it exists
     _compassSubscription?.cancel();
 
-    // Provide a simulated compass stream with throttling
-    Timer.periodic(const Duration(milliseconds: 200), (timer) {
+    // Provide a simulated compass stream
+    Timer.periodic(const Duration(milliseconds: 100), (timer) {
       // If the real compass starts working again, cancel this timer
       if (_compassSensorWorking) {
         timer.cancel();
@@ -107,14 +91,7 @@ class CompassService {
       // This will rotate slowly in a circle to simulate a working compass
       final now = DateTime.now();
       final angle = (now.millisecondsSinceEpoch / 50) % 360;
-      
-      // Apply throttling
-      final timeDiff = now.difference(_lastEmittedTime);
-      if (timeDiff > throttleDuration) {
-        _lastEmittedTime = now;
-        _lastHeading = angle;
-        _headingController.add(angle);
-      }
+      _headingController.add(angle);
     });
   }
 
@@ -124,18 +101,24 @@ class CompassService {
       developer.log("Compass available: $isAvailable", name: 'CompassService');
       return isAvailable;
     } catch (e) {
-      developer.log("Error checking compass availability", name: 'CompassService', error: e);
+      developer.log("Error checking compass availability: $e", name: 'CompassService', error: e);
       return false;
     }
   }
 
-  Future<double?> getCurrentHeading() async {
+  Future<double> getCurrentHeading() async {
     try {
-      final CompassEvent? event = await FlutterCompass.events?.first;
-      return event?.heading;
+      if (await isCompassAvailable() && _compassSensorWorking) {
+        final CompassEvent event = await FlutterCompass.events!.first;
+        return event.heading ?? 0;
+      } else {
+        developer.log("Using fallback heading", name: 'CompassService');
+        // Return a simulated value
+        return (DateTime.now().millisecondsSinceEpoch / 50) % 360;
+      }
     } catch (e) {
-      developer.log("Error getting current heading", name: 'CompassService', error: e);
-      return null;
+      developer.log("Error getting compass heading: $e", name: 'CompassService', error: e);
+      return 0;
     }
   }
 

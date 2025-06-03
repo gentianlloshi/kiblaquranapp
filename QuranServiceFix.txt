@@ -1,0 +1,130 @@
+// Complete fixed version of getSurahWithTranslation method
+Map<String, dynamic> getSurahWithTranslation(int surahNumber, String translatorId) {
+  try {
+    final surahKey = surahNumber.toString();
+
+    // Create safe placeholder for errors
+    final placeholderSurah = Surah(
+      number: surahNumber,
+      name: 'Surah $surahNumber',
+      englishName: 'Error Loading',
+      ayahs: []
+    );
+
+    // Load data if not loaded yet
+    if (_arabicQuran.isEmpty) {
+      print('⚠️ Arabic Quran not loaded, trying to load now');
+      loadQuranData();
+    }
+
+    // Get the Arabic surah safely
+    final arabicSurah = _arabicQuran[surahKey] ?? placeholderSurah;
+
+    // Get the translation safely
+    final translationMap = _translations[translatorId] ?? {};
+    final translationSurah = translationMap[surahKey] ?? placeholderSurah;
+
+    // Generate transliterations manually for safety
+    final transliterations = <String, String>{};
+    if (arabicSurah.ayahs.isNotEmpty) {
+      for (var ayah in arabicSurah.ayahs) {
+        if (ayah.text != null && ayah.text!.isNotEmpty) {
+          transliterations[ayah.numberInSurah.toString()] = _generateTransliteration(ayah.text!);
+        } else {
+          transliterations[ayah.numberInSurah.toString()] = '';
+        }
+      }
+    }
+
+    return {
+      'arabic': arabicSurah,
+      'translation': translationSurah,
+      'transliteration': transliterations,
+    };
+  } catch (e, stackTrace) {
+    print('❌ Error in getSurahWithTranslation: $e');
+    print('Stack trace: $stackTrace');
+
+    // Return safe default values
+    final placeholderSurah = Surah(
+      number: surahNumber,
+      name: 'Surah $surahNumber',
+      englishName: 'Error Loading',
+      ayahs: []
+    );
+
+    return {
+      'arabic': placeholderSurah,
+      'translation': placeholderSurah,
+      'transliteration': <String, String>{},
+    };
+  }
+}
+
+// Improved transliteration method
+String _generateTransliteration(String arabicText) {
+  try {
+    if (arabicText.isEmpty) {
+      return '';
+    }
+
+    // Map of Arabic characters to their Latin transliteration
+    final arabicToLatin = {
+      'ا': 'a', 'أ': 'a', 'إ': 'i', 'آ': 'ā',
+      'ب': 'b', 'ت': 't', 'ث': 'th',
+      'ج': 'j', 'ح': 'ḥ', 'خ': 'kh',
+      'د': 'd', 'ذ': 'dh', 'ر': 'r', 'ز': 'z',
+      'س': 's', 'ش': 'sh', 'ص': 'ṣ', 'ض': 'ḍ',
+      'ط': 'ṭ', 'ظ': 'ẓ', 'ع': 'ʿ', 'غ': 'gh',
+      'ف': 'f', 'ق': 'q', 'ك': 'k', 'ل': 'l',
+      'م': 'm', 'ن': 'n', 'ه': 'h', 'و': 'w',
+      'ي': 'y', 'ى': 'ā', 'ئ': 'ʾ', 'ء': 'ʾ',
+      'ؤ': 'ʾ', 'ة': 'h',
+      // Vowel marks
+      'َ': 'a', 'ِ': 'i', 'ُ': 'u',
+      'ً': 'an', 'ٍ': 'in', 'ٌ': 'un',
+      'ّ': '', // Shadda - handled specially below
+      'ْ': '', // Sukun
+      '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+      '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+    };
+
+    // Replace each Arabic character with its Latin equivalent
+    String result = '';
+    String previousChar = '';
+    bool previousCharHasShadda = false;
+
+    for (int i = 0; i < arabicText.length; i++) {
+      final char = arabicText[i];
+
+      // Check for shadda (consonant doubling)
+      if (char == 'ّ') {
+        previousCharHasShadda = true;
+        continue;
+      }
+
+      // Get transliteration for current character
+      String latinChar = arabicToLatin[char] ?? char;
+
+      // Handle shadda (consonant doubling)
+      if (previousCharHasShadda && latinChar.isNotEmpty) {
+        // Don't double vowels or special characters
+        if (!['a', 'i', 'u', 'ā', 'ī', 'ū', ' ', '.', ',', '?', '!', ':', ';', '-'].contains(latinChar)) {
+          result += latinChar;
+        }
+        previousCharHasShadda = false;
+      }
+
+      // Add the character to result
+      result += latinChar;
+      previousChar = char;
+    }
+
+    return result;
+  } catch (e, stackTrace) {
+    print('❌ Error generating transliteration: $e');
+    print('Stack trace: $stackTrace');
+    return arabicText; // Return original text on error
+  }
+}
+

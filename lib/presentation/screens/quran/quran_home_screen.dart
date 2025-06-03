@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../data/repositories/quran_repository.dart';
-import '../../../data/models/surah.dart';  // Added missing import for Surah
-import 'surah_list_screen.dart';
-import 'quran_favorites_screen.dart';
-import 'quran_settings_screen.dart';
+import './surah_list_screen.dart';
+import '../../../utils/translations.dart';
+import './quran_favorites_screen.dart';
+import './quran_settings_screen.dart';
 
 class QuranHomeScreen extends StatefulWidget {
   final QuranRepository quranRepository;
@@ -26,25 +26,59 @@ class _QuranHomeScreenState extends State<QuranHomeScreen> {
 
   Future<void> _initializeData() async {
     try {
+      // Show loading indicator immediately
+      setState(() {
+        _isLoading = true;
+      });
+
+      print('🔍 QuranHomeScreen: Starting initialization');
+      
+      // Use compute to move initialization to a background isolate
+      await Future.delayed(Duration.zero); // Ensure UI updates before heavy work
+      
       // Initialize repository if needed
       if (!widget.quranRepository.isDataLoaded) {
+        print('🔍 QuranHomeScreen: Repository not initialized, initializing now');
         await widget.quranRepository.initialize();
+        print('🔍 QuranHomeScreen: Repository initialization complete');
+      } else {
+        print('🔍 QuranHomeScreen: Repository already initialized');
       }
 
       // Get last read position
       final lastRead = await widget.quranRepository.getLastReadPosition();
+      print('🔍 QuranHomeScreen: Got last read position');
 
-      setState(() {
-        _lastRead = lastRead;
-        _isLoading = false;
-      });
+      // Only update state if widget is still mounted
+      if (mounted) {
+        setState(() {
+          _lastRead = lastRead;
+          _isLoading = false;
+        });
+        print('🔍 QuranHomeScreen: UI updated with last read position');
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error initializing Quran data: $e')),
-      );
+      print('❌ QuranHomeScreen ERROR: $e');
+      
+      // Only update state if widget is still mounted
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Error loading Quran data. Please restart the app.'),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: () => _initializeData(),
+            ),
+          ),
+        );
+      }
+      print('Error initializing Quran data: $e');
     }
   }
 
@@ -52,7 +86,7 @@ class _QuranHomeScreenState extends State<QuranHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kurani Fisnik'),
+        title: const Text(AppTranslations.quranTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -69,170 +103,86 @@ class _QuranHomeScreenState extends State<QuranHomeScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildLastReadCard(),
-                  const SizedBox(height: 24),
-
-                  _buildMenuCard(
-                    title: 'Browse Surahs',
-                    icon: Icons.menu_book,
-                    color: Colors.teal,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SurahListScreen(
-                            quranRepository: widget.quranRepository,
-                          ),
-                        ),
-                      ).then((_) => _initializeData());
-                    },
-                  ),
-
-                  _buildMenuCard(
-                    title: 'Favorites',
-                    icon: Icons.favorite,
-                    color: Colors.red,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => QuranFavoritesScreen(
-                            quranRepository: widget.quranRepository,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-
-                  _buildMenuCard(
-                    title: 'Settings',
-                    icon: Icons.settings,
-                    color: Colors.blue,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => QuranSettingsScreen(
-                            quranRepository: widget.quranRepository,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-    );
-  }
-
-  Widget _buildLastReadCard() {
-    if (_lastRead == null) {
-      return const Card(
-        elevation: 3,
+      body: SafeArea(
         child: Padding(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Welcome to the Quran',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Start your reading journey by browsing through the surahs below.',
-                style: TextStyle(fontSize: 16),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final surahNumber = _lastRead!['surah'] as int;
-    final ayahNumber = _lastRead!['ayah'] as int;
-
-    // Try to find the surah name
-    String surahName = 'Surah $surahNumber';
-    try {
-      final surahs = widget.quranRepository.getAllSurahs();
-      final surah = surahs.firstWhere(
-        (s) => s.number == surahNumber,
-        orElse: () => Surah(
-          number: surahNumber,
-          name: 'Surah $surahNumber',
-          englishName: 'Surah $surahNumber',
-          ayahs: []
-        )
-      );
-      surahName = surah.englishName;
-    } catch (_) {}
-
-    return Card(
-      elevation: 3,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SurahListScreen(
-                quranRepository: widget.quranRepository,
-              ),
-            ),
-          ).then((_) => _initializeData());
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.bookmark,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Continue Reading',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '$surahName, Verse $ayahNumber',
-                style: const TextStyle(
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SurahListScreen(
-                        quranRepository: widget.quranRepository,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        AppTranslations.welcomeToQuran,
+                        style: Theme.of(context).textTheme.headlineSmall,
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        AppTranslations.startReadingJourney,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: ListView(
+                  children: [
+                    _buildOptionTile(
+                      context,
+                      icon: Icons.menu_book,
+                      title: AppTranslations.browseQuran,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SurahListScreen(
+                              quranRepository: widget.quranRepository,
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ).then((_) => _initializeData());
-                },
-                child: const Text('Resume Reading'),
+                    _buildOptionTile(
+                      context,
+                      icon: Icons.favorite,
+                      title: AppTranslations.favorites,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => QuranFavoritesScreen(
+                              quranRepository: widget.quranRepository,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildOptionTile(
+                      context,
+                      icon: Icons.settings,
+                      title: AppTranslations.settings,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => QuranSettingsScreen(
+                              quranRepository: widget.quranRepository,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -241,39 +191,11 @@ class _QuranHomeScreenState extends State<QuranHomeScreen> {
     );
   }
 
-  Widget _buildMenuCard({
-    required String title,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: color.withOpacity(0.2),
-                child: Icon(icon, color: color),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Spacer(),
-              const Icon(Icons.arrow_forward_ios, size: 16),
-            ],
-          ),
-        ),
-      ),
+  Widget _buildOptionTile(BuildContext context, {required IconData icon, required String title, required VoidCallback onTap}) {
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      onTap: onTap,
     );
   }
 }

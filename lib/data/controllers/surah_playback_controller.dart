@@ -8,16 +8,25 @@ class SurahPlaybackController {
   final int totalAyahs;
   final Function(int) onAyahChange;
   final QuranAudioService _audioService = QuranAudioService();
+
+  // Use a single audio player instance for the entire controller lifecycle
   final AudioPlayer _audioPlayer = AudioPlayer();
   
+  // Playlist that will hold all ayahs for the surah
+  ConcatenatingAudioSource? _playlist;
+
+  // Track the current ayah being played
   int _currentAyah = 1;
   bool _isPlaying = false;
-  bool _isLoading = false;
-  bool _isTransitioning = false;
+  bool _isLoading = true;
+  bool _isPaused = false;
+  bool _userInitiatedStop = false;
+  bool _isInitialized = false;
+
+  // Stream subscriptions
+  StreamSubscription? _playerIndexSubscription;
   StreamSubscription? _playerStateSubscription;
-  StreamSubscription? _positionSubscription;
-  StreamSubscription? _processingStateSubscription;
-  
+
   SurahPlaybackController({
     required this.surahNumber,
     required this.totalAyahs,
@@ -27,134 +36,184 @@ class SurahPlaybackController {
   }
 
   void _initPlayer() {
+    debugPrint('Initializing SurahPlaybackController for Surah $surahNumber with $totalAyahs ayahs');
+
+    // Configure the player
     _audioPlayer.setLoopMode(LoopMode.off);
-    
+
+    // Listen to current playback index changes
+    _playerIndexSubscription = _audioPlayer.currentIndexStream.listen((index) {
+      if (index != null && _isPlaying && !_userInitiatedStop) {
+        // Index is 0-based, but ayah numbers are 1-based
+        final ayahNumber = index + 1;
+
+        debugPrint('Audio index changed to $index, corresponding to ayah $ayahNumber');
+
+        if (ayahNumber != _currentAyah) {
+          _currentAyah = ayahNumber;
+          onAyahChange(_currentAyah);
+        }
+      }
+    });
+
     // Listen to player state changes
     _playerStateSubscription = _audioPlayer.playerStateStream.listen((state) {
-      debugPrint('Player state changed: ${state.processingState}');
+      debugPrint('Player state changed: ${state.processingState} - Playing: ${state.playing}');
       
-      if (state.processingState == ProcessingState.completed && !_isTransitioning) {
-        _isTransitioning = true;
-        // Add a small delay before playing the next ayah to ensure clean transition
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _playNextAyah();
-        });
+      // Handle completion of the entire playlist
+      if (state.processingState == ProcessingState.completed) {
+        debugPrint('Playlist completed');
+        _isPlaying = false;
+        _currentAyah = 1;
       }
-    });
-    
-    // Listen to processing state changes for more detailed control
-    _processingStateSubscription = _audioPlayer.processingStateStream.listen((state) {
-      debugPrint('Processing state changed: $state');
-    });
-    
-    // Listen to position changes to debug playback
-    _positionSubscription = _audioPlayer.positionStream.listen((position) {
-      // Only log every second to avoid flooding the console
-      if (position.inMilliseconds % 1000 < 50) {
-        debugPrint('Position: ${position.inSeconds}s / ${_audioPlayer.duration?.inSeconds ?? 0}s');
-      }
+
+      // Update loading state based on processing state
+      _isLoading = state.processingState == ProcessingState.loading ||
+                   state.processingState == ProcessingState.buffering;
     });
   }
 
+  // Initialize the playlist with all audio URLs for the surah
+  Future<void> _initPlaylist() async {
+    debugPrint('Initializing playlist for Surah $surahNumber');
+    _isLoading = true;
+
+    try {
+      // Clear existing playlist
+      if (_playlist != null) {
+        await _audioPlayer.stop();
+        _playlist = null;
+      }
+
+      final audioSources = <AudioSource>[];
+
+      // Load audio for each ayah - no skipping any ayahs
+      for (int ayah = 1; ayah <= totalAyahs; ayah++) {
+        try {
+          final url = await _audioService.getVerseAudioUrl(surahNumber, ayah);
+          debugPrint('Adding ayah $ayah to playlist: $url');
+
+          audioSources.add(AudioSource.uri(Uri.parse(url)));
+        } catch (e) {
+          debugPrint('Error loading audio for ayah $ayah: $e');
+          // Try fallback if available, or continue with next ayah
+        }
+      }
+
+      if (audioSources.isEmpty) {
+        throw Exception('Could not load any audio sources');
+      }
+
+      // Create and set the playlist
+      _playlist = ConcatenatingAudioSource(children: audioSources);
+      await _audioPlayer.setAudioSource(_playlist!);
+      _isInitialized = true;
+      _isLoading = false;
+
+    } catch (e) {
+      debugPrint('Error initializing playlist: $e');
+      _isLoading = false;
+      _isInitialized = false;
+      rethrow;
+    }
+  }
+
+  // Start playback of the entire surah
   Future<void> startPlayback() async {
-    if (_isPlaying) return;
+    if (_isPlaying && !_isPaused) return;
     
-    _currentAyah = 1;
-    await _playCurrentAyah();
+    debugPrint('Starting playback of Surah $surahNumber');
+    _userInitiatedStop = false;
+    _isPaused = false;
+
+    // Initialize the playlist if needed
+    if (!_isInitialized || _playlist == null) {
+      await _initPlaylist();
+    }
+
+    if (_isPaused) {
+      // Resume playback
+      await _audioPlayer.play();
+    } else {
+      // Start from the beginning
+      _currentAyah = 1;
+      await _audioPlayer.seek(Duration.zero, index: 0);
+      await _audioPlayer.play();
+    }
+    
+    _isPlaying = true;
+    onAyahChange(_currentAyah);
   }
 
+  // Pause the current playback
   Future<void> pausePlayback() async {
     if (!_isPlaying) return;
     
+    debugPrint('Pausing playback at ayah $_currentAyah');
     await _audioPlayer.pause();
-    _isPlaying = false;
+    _isPaused = true;
   }
 
+  // Resume playback from where it was paused
   Future<void> resumePlayback() async {
-    if (_isPlaying) return;
+    if (!_isPaused) return;
     
+    debugPrint('Resuming playback from ayah $_currentAyah');
+    _isPaused = false;
     await _audioPlayer.play();
-    _isPlaying = true;
   }
 
-  Future<void> stopPlayback() async {
-    await _audioPlayer.stop();
-    _isPlaying = false;
-    _isTransitioning = false;
-    _currentAyah = 1;
-  }
+  // Skip to a specific ayah
+  Future<void> skipToAyah(int ayahNumber) async {
+    if (!_isInitialized || _playlist == null) {
+      debugPrint('Player not initialized yet, initializing first');
+      await _initPlaylist();
+    }
 
-  Future<void> _playCurrentAyah() async {
-    if (_currentAyah > totalAyahs) {
-      _isPlaying = false;
-      _isTransitioning = false;
+    if (ayahNumber < 1 || ayahNumber > totalAyahs) {
+      debugPrint('Invalid ayah number: $ayahNumber');
       return;
     }
 
-    _isLoading = true;
-    
-    try {
-      // Notify listeners that we're changing ayah
-      onAyahChange(_currentAyah);
-      
-      debugPrint('Loading ayah $surahNumber:$_currentAyah');
-      
-      // Get audio URL for current ayah
-      final audioUrl = await _audioService.getVerseAudioUrl(
-        surahNumber, 
-        _currentAyah
-      );
-      
-      debugPrint('Got audio URL: $audioUrl');
-      
-      // Stop any current playback
-      await _audioPlayer.stop();
-      
-      // Set the audio source and play
-      await _audioPlayer.setUrl(audioUrl);
-      final duration = await _audioPlayer.duration;
-      debugPrint('Audio duration: ${duration?.inSeconds ?? 0} seconds');
-      
-      await _audioPlayer.play();
-      
+    // Calculate the playlist index (0-based) from the ayah number (1-based)
+    final playlistIndex = ayahNumber - 1;
+    debugPrint('Skipping to ayah $ayahNumber (playlist index: $playlistIndex)');
+
+    // Seek to the beginning of the specified ayah
+    await _audioPlayer.seek(Duration.zero, index: playlistIndex);
+    _currentAyah = ayahNumber;
+
+    // If not already playing, start playback
+    if (!_isPlaying) {
       _isPlaying = true;
-      _isLoading = false;
-      _isTransitioning = false;
-    } catch (e) {
-      debugPrint('Error playing ayah $surahNumber:$_currentAyah - $e');
-      _isLoading = false;
-      _isTransitioning = false;
-      
-      // Add a delay before trying the next ayah
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Skip to next ayah if this one fails
-      _playNextAyah();
+      _isPaused = false;
+      await _audioPlayer.play();
     }
+
+    onAyahChange(_currentAyah);
   }
 
-  Future<void> _playNextAyah() async {
-    debugPrint('Moving to next ayah: ${_currentAyah + 1}');
-    _currentAyah++;
-    if (_currentAyah <= totalAyahs) {
-      await _playCurrentAyah();
-    } else {
-      // We've reached the end of the surah
-      debugPrint('Reached end of surah');
-      _isPlaying = false;
-      _isTransitioning = false;
-      _currentAyah = 1;
-    }
+  // Stop playback completely
+  Future<void> stopPlayback() async {
+    debugPrint('Stopping playback');
+    _userInitiatedStop = true;
+    await _audioPlayer.stop();
+    _isPlaying = false;
+    _isPaused = false;
+    _currentAyah = 1;
   }
 
-  bool get isPlaying => _isPlaying;
+  // Public getters
+  bool get isPlaying => _isPlaying && !_isPaused;
   bool get isLoading => _isLoading;
+  bool get isPaused => _isPaused;
   int get currentAyah => _currentAyah;
 
+  // Clean up resources
   void dispose() {
+    debugPrint('Disposing SurahPlaybackController');
+    _playerIndexSubscription?.cancel();
     _playerStateSubscription?.cancel();
-    _positionSubscription?.cancel();
-    _processingStateSubscription?.cancel();
     _audioPlayer.dispose();
   }
 }

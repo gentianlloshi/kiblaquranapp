@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 class QuranPreferencesService {
   // Singleton pattern
@@ -21,7 +22,7 @@ class QuranPreferencesService {
   static const String _kTransliterationFontSize = 'transliterationFontSize';
 
   // Default values
-  static const String _defaultTranslator = 'sq.ahmeti';
+  static const String _defaultTranslator = 'sq_ahmeti';
   static const String _defaultReciter = 'ar.alafasy';
   static const String _defaultArabicFontFamily = 'ScheherazadeNew';
   static const double _defaultArabicFontSize = 2.0;
@@ -30,13 +31,37 @@ class QuranPreferencesService {
 
   // Methods to get and set preferences
   Future<String> getCurrentTranslator() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_kCurrentTranslator) ?? _defaultTranslator;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String translatorId = prefs.getString(_kCurrentTranslator) ?? _defaultTranslator;
+
+      // Ensure consistent format (underscores, not dots)
+      if (translatorId.contains('.')) {
+        translatorId = translatorId.replaceAll('.', '_');
+        // Save the converted value back
+        await prefs.setString(_kCurrentTranslator, translatorId);
+        developer.log('Converted translator ID from dots to underscores: $translatorId', name: 'QuranPreferences');
+      }
+
+      developer.log('Using translator: $translatorId', name: 'QuranPreferences');
+      return translatorId;
+    } catch (e) {
+      developer.log('Error getting translator ID: $e', name: 'QuranPreferences', error: e);
+      return _defaultTranslator;
+    }
   }
 
   Future<void> setCurrentTranslator(String translatorId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kCurrentTranslator, translatorId);
+    try {
+      // Always ensure consistent format before saving
+      translatorId = translatorId.replaceAll('.', '_');
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kCurrentTranslator, translatorId);
+      developer.log('Translator set to: $translatorId', name: 'QuranPreferences');
+    } catch (e) {
+      developer.log('Error setting translator: $e', name: 'QuranPreferences', error: e);
+    }
   }
 
   Future<String> getCurrentReciter() async {

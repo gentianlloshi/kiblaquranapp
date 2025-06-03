@@ -39,11 +39,12 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
   void _startCountdownTimer() {
     _countdownTimer?.cancel();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _countdownTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      // Only update UI every 30 seconds instead of every second
       final prayerRepository = Provider.of<PrayerRepository>(context, listen: false);
       final nextPrayer = prayerRepository.nextPrayer;
 
-      if (nextPrayer != null) {
+      if (nextPrayer != null && mounted) {
         final now = DateTime.now();
         final timeUntil = nextPrayer.time.difference(now);
 

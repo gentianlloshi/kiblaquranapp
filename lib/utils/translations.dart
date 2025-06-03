@@ -108,4 +108,6 @@ class AppTranslations {
   static const pauseSurah = 'Ndalo Suren';
   static const playingAyah = 'Duke luajtur Ajetin';
   static const favoriteToggled = 'Shtuar/Hequr nga të preferuarat';
+  static const nowPlaying = 'Tani Duke Luajtur';
+  static const errorPlayingAudio = 'Gabim gjatë luajtjes së audios';
 }

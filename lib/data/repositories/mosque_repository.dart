@@ -28,6 +28,10 @@ class MosqueRepository extends ChangeNotifier {
     try {
       final position = await _locationService.getCurrentLocation();
 
+      if (position == null) {
+        throw Exception('Could not get location');
+      }
+
       // In a real app, this would fetch data from an API
       await Future.delayed(const Duration(milliseconds: 800)); // Simulate network delay
       _loadDummyMosques(position.latitude, position.longitude);

@@ -9,7 +9,7 @@ class Ayah {
 
   factory Ayah.fromJson(Map<String, dynamic> json) {
     return Ayah(
-      numberInSurah: json['numberInSurah'],
+      numberInSurah: json['numberInSurah'] ?? json['verse'], // Accepts both
       text: json['text'],
     );
   }
